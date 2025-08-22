@@ -1,0 +1,126 @@
+version: '3.8'
+
+services:
+  # 后端API服务
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: coding_efficiency_backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=docker
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-jwt-secret-key-here}
+      - DATABASE_URL=sqlite:///data/coding_efficiency.db
+      - REDIS_URL=redis://redis:6379/0
+      - CACHE_REDIS_URL=redis://redis:6379/0
+      - RATELIMIT_STORAGE_URL=redis://redis:6379/1
+    volumes:
+      - backend_data:/app/data
+      - backend_logs:/app/logs
+      - backend_uploads:/app/uploads
+    depends_on:
+      - redis
+    networks:
+      - coding_efficiency_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Redis缓存服务
+  redis:
+    image: redis:7-alpine
+    container_name: coding_efficiency_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - coding_efficiency_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 前端服务（开发环境）
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: coding_efficiency_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - REACT_APP_API_URL=http://localhost:5000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - coding_efficiency_network
+    profiles:
+      - dev
+
+  # Nginx反向代理（生产环境）
+  nginx:
+    image: nginx:alpine
+    container_name: coding_efficiency_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - frontend_build:/usr/share/nginx/html
+    depends_on:
+      - backend
+    networks:
+      - coding_efficiency_network
+    profiles:
+      - prod
+
+  # 数据库备份服务
+  backup:
+    image: alpine:latest
+    container_name: coding_efficiency_backup
+    restart: "no"
+    volumes:
+      - backend_data:/data:ro
+      - ./backups:/backups
+    command: |
+      sh -c '
+        apk add --no-cache sqlite
+        mkdir -p /backups
+        sqlite3 /data/coding_efficiency.db ".backup /backups/backup_$$(date +%Y%m%d_%H%M%S).db"
+        find /backups -name "backup_*.db" -mtime +7 -delete
+      '
+    profiles:
+      - backup
+
+volumes:
+  backend_data:
+    driver: local
+  backend_logs:
+    driver: local
+  backend_uploads:
+    driver: local
+  redis_data:
+    driver: local
+  frontend_build:
+    driver: local
+
+networks:
+  coding_efficiency_network:
+    driver: bridge
