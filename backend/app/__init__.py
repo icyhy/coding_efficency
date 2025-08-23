@@ -41,11 +41,45 @@ def create_app(config_name='default'):
     cors.init_app(app, origins=app.config['CORS_ORIGINS'])
     migrate.init_app(app, db)
     
+    # 导入所有模型以确保Flask-Migrate能够检测到它们
+    from app.models import User, Repository, Commit, MergeRequest, AnalyticsCache, IntegrationConfig
+    
     # 注册蓝图
     from app.api import auth_bp, repository_bp, analytics_bp
+    print(f"注册蓝图: auth_bp = {auth_bp}")
+    print(f"注册蓝图: repository_bp = {repository_bp}")
+    print(f"注册蓝图: analytics_bp = {analytics_bp}")
+    
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(repository_bp, url_prefix='/api/repositories')
     app.register_blueprint(analytics_bp, url_prefix='/api/analytics')
+    
+    print("蓝图注册完成")
+    print("已注册的路由:")
+    for rule in app.url_map.iter_rules():
+        print(f"  {rule.rule} -> {rule.endpoint} [{', '.join(rule.methods)}]")
+    
+    # 添加健康检查端点
+    @app.route('/health')
+    def health_check():
+        """健康检查端点"""
+        return {'status': 'healthy', 'message': 'API is running'}, 200
+    
+    # 添加API信息端点
+    @app.route('/api/info')
+    def api_info():
+        """API信息端点"""
+        return {
+            'name': 'Coding Efficiency Analytics API',
+            'version': '1.0.0',
+            'description': '软件开发团队效率统计分析工具API',
+            'endpoints': {
+                'auth': '/api/auth',
+                'repositories': '/api/repositories',
+                'analytics': '/api/analytics'
+            },
+            'documentation': '/api/docs'
+        }, 200
     
     # 配置日志
     configure_logging(app)
@@ -98,7 +132,8 @@ def register_error_handlers(app):
     """
     @app.errorhandler(404)
     def not_found_error(error):
-        return {'error': 'Resource not found'}, 404
+        from flask import request
+        return {'error': 'Resource not found', 'path': request.path, 'method': request.method}, 404
     
     @app.errorhandler(500)
     def internal_error(error):

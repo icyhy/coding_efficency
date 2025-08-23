@@ -18,7 +18,7 @@ export function getToken() {
  */
 export function setToken(token, options = {}) {
   const defaultOptions = {
-    expires: 1, // 1天过期
+    expires: 1/48, // 30分钟过期 (1/48 天)
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict'
   }

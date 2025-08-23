@@ -157,57 +157,78 @@ class AliYunXiaoService(GitService):
     """
     阿里云效Git服务集成
     实现阿里云效API的具体调用逻辑
+    
+    参考文档：
+    - ListRepositories API: https://help.aliyun.com/zh/yunxiao/developer-reference/listrepositories-query-code-base-list
+    - GetRepository API: https://help.aliyun.com/zh/yunxiao/developer-reference/api-devops-2021-06-25-getrepository
     """
     
-    def __init__(self, api_key: str, organization_id: str = None):
+    def __init__(self, api_key: str, organization_id: str = None, domain: str = None):
         """
         初始化阿里云效服务
         
         Args:
-            api_key (str): API密钥
+            api_key (str): 个人访问令牌 (x-yunxiao-token)
             organization_id (str): 组织ID
+            domain (str): 服务接入点域名，默认为 devops.aliyun.com
         """
-        # 阿里云效API基础URL
-        base_url = 'https://devops.aliyun.com/api/v4'
+        # 云效新版API基础URL
+        self.domain = domain or 'devops.aliyun.com'
+        base_url = f'https://{self.domain}'
         super().__init__(api_key, base_url)
         
         self.organization_id = organization_id
         
-        # 设置阿里云效特定的请求头
+        # 设置云效特定的请求头
         self.session.headers.update({
-            'PRIVATE-TOKEN': self.api_key
+            'x-yunxiao-token': self.api_key,
+            'Content-Type': 'application/json'
         })
     
     def test_connection(self) -> Tuple[bool, str]:
         """
-        测试阿里云效API连接
+        测试云效API连接
         
         Returns:
             Tuple[bool, str]: (是否成功, 错误信息)
         """
         try:
-            url = urljoin(self.base_url, '/user')
-            response = self._make_request('GET', url)
+            if not self.organization_id:
+                return False, "缺少组织ID"
+            
+            # 使用获取仓库列表API测试连接（只获取1个仓库）
+            url = f"{self.base_url}/oapi/v1/codeup/organizations/{self.organization_id}/repositories"
+            params = {
+                'page': 1,
+                'perPage': 1
+            }
+            
+            response = self._make_request('GET', url, params=params)
             
             if response.status_code == 200:
-                user_data = response.json()
-                current_app.logger.info(
-                    f"阿里云效API连接成功，用户: {user_data.get('name', 'Unknown')}"
-                )
+                current_app.logger.info("云效API连接成功")
                 return True, "连接成功"
+            elif response.status_code == 401:
+                return False, "认证失败，请检查访问令牌"
+            elif response.status_code == 403:
+                return False, "权限不足，请检查访问令牌权限"
+            elif response.status_code == 404:
+                return False, "组织不存在或无权限访问"
             else:
                 return False, f"连接失败，状态码: {response.status_code}"
                 
         except requests.RequestException as e:
-            current_app.logger.error(f"阿里云效API连接测试失败: {str(e)}")
+            current_app.logger.error(f"云效API连接测试失败: {str(e)}")
             return False, str(e)
         except Exception as e:
-            current_app.logger.error(f"阿里云效API连接测试异常: {str(e)}")
+            current_app.logger.error(f"云效API连接测试异常: {str(e)}")
             return False, "连接测试异常"
     
     def get_repositories(self) -> List[Dict]:
         """
-        获取阿里云效仓库列表
+        获取云效仓库列表
+        
+        使用云效新版API: /oapi/v1/codeup/organizations/{organizationId}/repositories
         
         Returns:
             List[Dict]: 仓库列表
@@ -217,27 +238,35 @@ class AliYunXiaoService(GitService):
         per_page = 100
         
         try:
+            if not self.organization_id:
+                raise ValueError("缺少组织ID")
+            
             while True:
-                url = urljoin(self.base_url, '/projects')
+                url = f"{self.base_url}/oapi/v1/codeup/organizations/{self.organization_id}/repositories"
                 params = {
                     'page': page,
-                    'per_page': per_page,
-                    'membership': True,  # 只获取用户有权限的项目
-                    'archived': False,   # 排除已归档的项目
-                    'simple': False      # 获取详细信息
+                    'perPage': per_page,
+                    'orderBy': 'created_at',
+                    'sort': 'desc',
+                    'archived': False  # 排除已归档的仓库
                 }
                 
-                if self.organization_id:
-                    params['owned'] = True
-                
                 response = self._make_request('GET', url, params=params)
+                
+                if response.status_code != 200:
+                    current_app.logger.error(f"获取仓库列表失败，状态码: {response.status_code}")
+                    current_app.logger.error(f"响应内容: {response.text}")
+                    break
+                
                 data = response.json()
                 
-                if not data:
+                if not data or not isinstance(data, list):
                     break
                 
                 for repo in data:
-                    repositories.append(self._format_repository(repo))
+                    formatted_repo = self._format_repository(repo)
+                    if formatted_repo:
+                        repositories.append(formatted_repo)
                 
                 # 检查是否还有更多页面
                 if len(data) < per_page:
@@ -246,14 +275,14 @@ class AliYunXiaoService(GitService):
                 page += 1
                 time.sleep(0.1)  # 避免请求过于频繁
             
-            current_app.logger.info(f"获取到 {len(repositories)} 个阿里云效仓库")
+            current_app.logger.info(f"获取到 {len(repositories)} 个云效仓库")
             return repositories
             
         except requests.RequestException as e:
-            current_app.logger.error(f"获取阿里云效仓库列表失败: {str(e)}")
+            current_app.logger.error(f"获取云效仓库列表失败: {str(e)}")
             raise
         except Exception as e:
-            current_app.logger.error(f"获取阿里云效仓库列表异常: {str(e)}")
+            current_app.logger.error(f"获取云效仓库列表异常: {str(e)}")
             raise
     
     def get_repository_info(self, repo_id: str) -> Optional[Dict]:
@@ -422,31 +451,51 @@ class AliYunXiaoService(GitService):
     
     def _format_repository(self, repo_data: Dict) -> Dict:
         """
-        格式化仓库数据
+        格式化云效仓库数据
+        
+        根据云效新版API返回的数据格式进行转换
+        参考: https://help.aliyun.com/zh/yunxiao/developer-reference/listrepositories-query-code-base-list
         
         Args:
-            repo_data (Dict): 原始仓库数据
+            repo_data (Dict): 云效API返回的原始仓库数据
         
         Returns:
             Dict: 格式化后的仓库数据
         """
-        return {
-            'id': str(repo_data.get('id', '')),
-            'name': repo_data.get('name', ''),
-            'full_name': repo_data.get('path_with_namespace', ''),
-            'description': repo_data.get('description', ''),
-            'url': repo_data.get('web_url', ''),
-            'clone_url': repo_data.get('http_url_to_repo', ''),
-            'ssh_url': repo_data.get('ssh_url_to_repo', ''),
-            'default_branch': repo_data.get('default_branch', 'master'),
-            'visibility': repo_data.get('visibility', 'private'),
-            'created_at': repo_data.get('created_at', ''),
-            'updated_at': repo_data.get('last_activity_at', ''),
-            'stars_count': repo_data.get('star_count', 0),
-            'forks_count': repo_data.get('forks_count', 0),
-            'open_issues_count': repo_data.get('open_issues_count', 0),
-            'platform': 'aliyunxiao'
-        }
+        try:
+            # 云效新API返回的字段映射
+            return {
+                'id': str(repo_data.get('id', '')),
+                'name': repo_data.get('name', ''),
+                'full_name': repo_data.get('pathWithNamespace', ''),  # 云效新API字段
+                'description': repo_data.get('description', ''),
+                'url': repo_data.get('webUrl', ''),  # 云效新API字段
+                'clone_url': f"https://{self.domain}/{repo_data.get('pathWithNamespace', '')}.git",  # 构造克隆URL
+                'ssh_url': f"git@{self.domain}:{repo_data.get('pathWithNamespace', '')}.git",  # 构造SSH URL
+                'default_branch': 'master',  # 云效新API未直接提供，使用默认值
+                'visibility': repo_data.get('visibility', 'private'),
+                'created_at': repo_data.get('createdAt', ''),  # 云效新API字段
+                'updated_at': repo_data.get('lastActivityAt', ''),  # 云效新API字段
+                'stars_count': repo_data.get('starCount', 0),  # 云效新API字段
+                'forks_count': 0,  # 云效新API未提供，使用默认值
+                'open_issues_count': 0,  # 云效新API未提供，使用默认值
+                'platform': 'aliyunxiao',
+                # 云效特有字段
+                'access_level': repo_data.get('accessLevel', ''),
+                'archived': repo_data.get('archived', False),
+                'avatar_url': repo_data.get('avatarUrl', ''),
+                'creator_id': repo_data.get('creatorId', 0),
+                'demo_project': repo_data.get('demoProject', False),
+                'encrypted': repo_data.get('encrypted', False),
+                'namespace_id': repo_data.get('namespaceId', 0),
+                'path': repo_data.get('path', ''),
+                'repository_size': repo_data.get('repositorySize', '0'),
+                'starred': repo_data.get('starred', False)
+            }
+        except Exception as e:
+            current_app.logger.error(f"格式化云效仓库数据失败: {str(e)}")
+            current_app.logger.error(f"原始数据: {repo_data}")
+            return None
     
     def _format_commit(self, commit_data: Dict, repo_id: str) -> Optional[Dict]:
         """
@@ -566,12 +615,14 @@ class AliYunXiaoService(GitService):
 
 def create_git_service(platform: str, api_key: str, **kwargs) -> GitService:
     """
-    创建Git服务实例
+    创建Git服务实例的工厂函数
     
     Args:
-        platform (str): 平台名称
+        platform (str): Git平台类型 ('aliyunxiao', 'yunxiao')
         api_key (str): API密钥
-        **kwargs: 其他参数
+        **kwargs: 其他平台特定参数
+            - base_url: API基础URL
+            - organization_id: 组织ID
     
     Returns:
         GitService: Git服务实例
@@ -587,11 +638,21 @@ def create_git_service(platform: str, api_key: str, **kwargs) -> GitService:
             current_app.logger.error(f"解密API密钥失败: {str(e)}")
             raise ValueError("API密钥解密失败")
     
-    if platform.lower() == 'aliyunxiao':
-        return AliYunXiaoService(
+    platform_lower = platform.lower()
+    if platform_lower in ['aliyunxiao', 'yunxiao']:
+        # 创建云效服务实例
+        service = AliYunXiaoService(
             api_key=api_key,
-            organization_id=kwargs.get('organization_id')
+            organization_id=kwargs.get('organization_id'),
+            domain=kwargs.get('domain')  # 传递domain参数
         )
+        
+        # 如果提供了自定义base_url，则覆盖默认值
+        base_url = kwargs.get('base_url')
+        if base_url:
+            service.base_url = base_url
+            
+        return service
     else:
         raise ValueError(f"不支持的Git平台: {platform}")
 

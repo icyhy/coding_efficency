@@ -9,11 +9,13 @@ from .repository import Repository
 from .commit import Commit
 from .merge_request import MergeRequest
 from .analytics_cache import AnalyticsCache
+from .integration_config import IntegrationConfig
 
 __all__ = [
     'User',
     'Repository', 
     'Commit',
     'MergeRequest',
-    'AnalyticsCache'
+    'AnalyticsCache',
+    'IntegrationConfig'
 ]

@@ -322,7 +322,7 @@ def parse_datetime_string(date_string: str) -> Optional[datetime]:
         return None
 
 def get_date_range_by_params(start_date: Optional[str] = None, end_date: Optional[str] = None, 
-                  days: Optional[int] = None) -> Tuple[datetime, datetime]:
+                  days: Optional[int] = None, strict: bool = False) -> Tuple[datetime, datetime]:
     """
     获取日期范围
     
@@ -330,9 +330,13 @@ def get_date_range_by_params(start_date: Optional[str] = None, end_date: Optiona
         start_date (str, optional): 开始日期字符串
         end_date (str, optional): 结束日期字符串
         days (int, optional): 天数（从今天往前推）
+        strict (bool): 严格模式，无效日期时抛出异常
     
     Returns:
         tuple: (开始日期, 结束日期)
+        
+    Raises:
+        ValueError: 当strict=True且日期格式无效时
     """
     now = datetime.utcnow()
     
@@ -346,6 +350,8 @@ def get_date_range_by_params(start_date: Optional[str] = None, end_date: Optiona
     if start_date:
         start_dt = parse_datetime_string(start_date)
         if not start_dt:
+            if strict:
+                raise ValueError(f"无效的开始日期格式: {start_date}")
             start_dt = now - timedelta(days=30)  # 默认30天前
     else:
         start_dt = now - timedelta(days=30)  # 默认30天前
@@ -354,12 +360,16 @@ def get_date_range_by_params(start_date: Optional[str] = None, end_date: Optiona
     if end_date:
         end_dt = parse_datetime_string(end_date)
         if not end_dt:
+            if strict:
+                raise ValueError(f"无效的结束日期格式: {end_date}")
             end_dt = now
     else:
         end_dt = now
     
     # 确保开始日期不晚于结束日期
     if start_dt > end_dt:
+        if strict:
+            raise ValueError("开始日期不能晚于结束日期")
         start_dt, end_dt = end_dt, start_dt
     
     return start_dt, end_dt

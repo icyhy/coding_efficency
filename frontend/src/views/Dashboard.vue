@@ -326,7 +326,7 @@ export default {
         chartData.commits.values = values
         
         commitChart = echarts.init(commitChartRef.value)
-        option = {
+        const option = {
           tooltip: {
             trigger: 'axis',
             axisPointer: {
@@ -379,6 +379,10 @@ export default {
             }
           }]
         }
+        
+        if (commitChart) {
+          commitChart.setOption(option)
+        }
       } catch (error) {
         console.error('初始化提交图表失败:', error)
         // 使用默认数据
@@ -386,7 +390,7 @@ export default {
         const defaultValues = [12, 19, 15, 25, 22, 18, 20]
         
         commitChart = echarts.init(commitChartRef.value)
-        option = {
+        const option = {
           tooltip: {
             trigger: 'axis',
             axisPointer: {
@@ -430,15 +434,17 @@ export default {
             }
           }]
         }
-      }
-      
-      if (option && commitChart) {
-        commitChart.setOption(option)
+        
+        if (commitChart) {
+          commitChart.setOption(option)
+        }
       }
     }
 
     const initMergeRequestChart = async () => {
       if (!mergeRequestChartRef.value) return
+      
+      let option
       
       try {
         // 获取合并请求数据
@@ -470,7 +476,7 @@ export default {
         }
         
         mergeRequestChart = echarts.init(mergeRequestChartRef.value)
-        const option = {
+        option = {
           tooltip: {
             trigger: 'item',
             formatter: function(params) {
@@ -508,7 +514,7 @@ export default {
         console.error('初始化合并请求图表失败:', error)
         // 使用默认数据
         mergeRequestChart = echarts.init(mergeRequestChartRef.value)
-        const option = {
+        option = {
           tooltip: {
             trigger: 'item'
           },

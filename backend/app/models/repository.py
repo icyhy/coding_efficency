@@ -38,6 +38,7 @@ class Repository(db.Model):
     platform = db.Column(db.String(50), nullable=False, default='yunxiao')
     project_id = db.Column(db.String(100), nullable=True)  # 云效项目ID
     is_active = db.Column(db.Boolean, default=True, nullable=False)
+    is_tracked = db.Column(db.Boolean, default=False, nullable=False)  # 是否纳入统计
     last_sync_at = db.Column(db.DateTime, nullable=True)
     sync_status = db.Column(db.String(50), default='pending')  # pending, syncing, success, error
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
@@ -47,7 +48,7 @@ class Repository(db.Model):
     commits = db.relationship('Commit', backref='repository', lazy='dynamic', cascade='all, delete-orphan')
     merge_requests = db.relationship('MergeRequest', backref='repository', lazy='dynamic', cascade='all, delete-orphan')
     
-    def __init__(self, user_id, name, url, api_key, platform='yunxiao', project_id=None):
+    def __init__(self, user_id, name, url, api_key, platform='yunxiao', project_id=None, is_tracked=False):
         """
         初始化仓库实例
         
@@ -58,12 +59,14 @@ class Repository(db.Model):
             api_key (str): API密钥
             platform (str): 平台类型
             project_id (str): 项目ID
+            is_tracked (bool): 是否纳入统计
         """
         self.user_id = user_id
         self.name = name
         self.url = url
         self.platform = platform
         self.project_id = project_id
+        self.is_tracked = is_tracked
         self.set_api_key(api_key)
     
     def set_api_key(self, api_key):
@@ -127,6 +130,7 @@ class Repository(db.Model):
             'platform': self.platform,
             'project_id': self.project_id,
             'is_active': self.is_active,
+            'is_tracked': self.is_tracked,
             'sync_status': self.sync_status,
             'last_sync_at': self.last_sync_at.isoformat() if self.last_sync_at else None,
             'created_at': self.created_at.isoformat(),

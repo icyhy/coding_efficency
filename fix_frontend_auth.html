@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>修复前端认证问题</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .step {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #fafafa;
+        }
+        .step h3 {
+            color: #007bff;
+            margin-top: 0;
+        }
+        button {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .result {
+            background-color: #f8f9fa;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .success {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .error {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .warning {
+            color: #ffc107;
+            font-weight: bold;
+        }
+        .info {
+            color: #17a2b8;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 修复前端认证问题</h1>
+        
+        <div class="step">
+            <h3>步骤 1: 检查当前状态</h3>
+            <p>首先检查当前的认证状态和Cookie</p>
+            <button onclick="checkCurrentStatus()">检查当前状态</button>
+            <div id="statusResult" class="result"></div>
+        </div>
+        
+        <div class="step">
+            <h3>步骤 2: 登录获取Token</h3>
+            <p>使用管理员账户登录获取有效的认证Token</p>
+            <div class="login-form">
+                <input type="text" id="username" placeholder="用户名" value="admin">
+                <input type="password" id="password" placeholder="密码" value="admin123">
+                <button onclick="performLogin()">登录并设置Token</button>
+            </div>
+            <div id="loginResult" class="result"></div>
+        </div>
+        
+        <div class="step">
+            <h3>步骤 3: 验证修复结果</h3>
+            <p>测试认证是否已修复，验证API调用</p>
+            <button onclick="testAPIs()">测试API调用</button>
+            <div id="testResult" class="result"></div>
+        </div>
+        
+        <div class="step">
+            <h3>步骤 4: 打开主应用</h3>
+            <p>认证修复后，可以正常使用主应用</p>
+            <button onclick="openMainApp()">打开主应用</button>
+        </div>
+    </div>
+
+    <script>
+        let authToken = null;
+        let refreshToken = null;
+        
+        function checkCurrentStatus() {
+            const result = document.getElementById('statusResult');
+            result.innerHTML = '正在检查当前状态...';
+            
+            // 检查Cookie
+            const cookies = document.cookie;
+            const cookieObj = {};
+            if (cookies) {
+                cookies.split(';').forEach(cookie => {
+                    const [name, value] = cookie.trim().split('=');
+                    cookieObj[name] = value;
+                });
+            }
+            
+            authToken = cookieObj['coding_efficiency_token'];
+            refreshToken = cookieObj['coding_efficiency_refresh_token'];
+            
+            let status = '当前认证状态:\n';
+            status += `Cookie数量: ${Object.keys(cookieObj).length}\n`;
+            
+            if (authToken) {
+                status += '<span class="success">✓ 找到认证Token</span>\n';
+            } else {
+                status += '<span class="error">✗ 未找到认证Token</span>\n';
+            }
+            
+            if (refreshToken) {
+                status += '<span class="success">✓ 找到刷新Token</span>\n';
+            } else {
+                status += '<span class="error">✗ 未找到刷新Token</span>\n';
+            }
+            
+            // 检查LocalStorage
+            const storageItems = Object.keys(localStorage).length;
+            status += `\nLocalStorage项目数: ${storageItems}\n`;
+            
+            if (authToken) {
+                status += '\n<span class="info">建议: Token已存在，可以直接测试API</span>';
+            } else {
+                status += '\n<span class="warning">建议: 需要登录获取Token</span>';
+            }
+            
+            result.innerHTML = status;
+        }
+        
+        async function performLogin() {
+            const result = document.getElementById('loginResult');
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            if (!username || !password) {
+                result.innerHTML = '<span class="error">请输入用户名和密码</span>';
+                return;
+            }
+            
+            result.innerHTML = '正在登录...';
+            
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    if (data.success && data.data) {
+                        authToken = data.data.access_token;
+                        refreshToken = data.data.refresh_token;
+                        
+                        // 设置Cookie
+                        document.cookie = `coding_efficiency_token=${authToken}; path=/; max-age=86400; SameSite=Strict`;
+                        if (refreshToken) {
+                            document.cookie = `coding_efficiency_refresh_token=${refreshToken}; path=/; max-age=604800; SameSite=Strict`;
+                        }
+                        
+                        // 设置LocalStorage（模拟前端应用行为）
+                        const userInfo = {
+                            id: data.data.id,
+                            username: data.data.username,
+                            email: data.data.email,
+                            is_active: data.data.is_active
+                        };
+                        localStorage.setItem('user_info', JSON.stringify(userInfo));
+                        
+                        result.innerHTML = `<span class="success">✓ 登录成功！</span>\n\n用户信息:\n${JSON.stringify(userInfo, null, 2)}\n\n<span class="info">Token已设置到Cookie中</span>`;
+                    } else {
+                        result.innerHTML = `<span class="error">登录失败:</span>\n${data.message || '未知错误'}`;
+                    }
+                } else {
+                    const errorData = await response.json();
+                    result.innerHTML = `<span class="error">登录失败 (${response.status}):</span>\n${JSON.stringify(errorData, null, 2)}`;
+                }
+            } catch (error) {
+                result.innerHTML = `<span class="error">登录错误:</span>\n${error.message}`;
+            }
+        }
+        
+        async function testAPIs() {
+            const result = document.getElementById('testResult');
+            result.innerHTML = '正在测试API调用...';
+            
+            if (!authToken) {
+                result.innerHTML = '<span class="error">没有认证Token，请先登录</span>';
+                return;
+            }
+            
+            let testResults = '';
+            
+            // 测试用户信息API
+            try {
+                const profileResponse = await fetch('/api/auth/profile', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (profileResponse.ok) {
+                    testResults += '<span class="success">✓ 用户信息API - 成功</span>\n';
+                } else {
+                    testResults += `<span class="error">✗ 用户信息API - 失败 (${profileResponse.status})</span>\n`;
+                }
+            } catch (error) {
+                testResults += `<span class="error">✗ 用户信息API - 错误: ${error.message}</span>\n`;
+            }
+            
+            // 测试仓库API
+            try {
+                const repoResponse = await fetch('/api/repositories/', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (repoResponse.ok) {
+                    const repoData = await repoResponse.json();
+                    testResults += '<span class="success">✓ 仓库列表API - 成功</span>\n';
+                    testResults += `  找到 ${repoData.data?.pagination?.total || 0} 个仓库\n`;
+                } else {
+                    testResults += `<span class="error">✗ 仓库列表API - 失败 (${repoResponse.status})</span>\n`;
+                }
+            } catch (error) {
+                testResults += `<span class="error">✗ 仓库列表API - 错误: ${error.message}</span>\n`;
+            }
+            
+            // 测试云效搜索API
+            try {
+                const yunxiaoResponse = await fetch('/api/repositories/yunxiao/search?keyword=test', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (yunxiaoResponse.ok) {
+                    testResults += '<span class="success">✓ 云效搜索API - 成功</span>\n';
+                } else {
+                    testResults += `<span class="error">✗ 云效搜索API - 失败 (${yunxiaoResponse.status})</span>\n`;
+                }
+            } catch (error) {
+                testResults += `<span class="error">✗ 云效搜索API - 错误: ${error.message}</span>\n`;
+            }
+            
+            testResults += '\n<span class="info">API测试完成！</span>\n';
+            testResults += '如果所有API都成功，说明认证问题已修复。';
+            
+            result.innerHTML = testResults;
+        }
+        
+        function openMainApp() {
+            window.open('http://localhost:3000', '_blank');
+        }
+        
+        // 页面加载时自动检查状态
+        window.onload = function() {
+            checkCurrentStatus();
+        };
+    </script>
+</body>
+</html>

@@ -14,11 +14,17 @@ from datetime import timedelta
 import os
 import logging
 from logging.handlers import RotatingFileHandler
+from dotenv import load_dotenv
 
-from app.models import db, User
+# 加载环境变量
+load_dotenv()
+
+from app import db
+from app.models import User
 from app.api import api_bp
 from app.utils.response import error_response, validation_error_response
 from app.utils.crypto import hash_password
+from config import config
 
 def create_app(config_name='development'):
     """
@@ -33,7 +39,8 @@ def create_app(config_name='development'):
     app = Flask(__name__)
     
     # 加载配置
-    load_config(app, config_name)
+    app.config.from_object(config[config_name])
+    config[config_name].init_app(app)
     
     # 初始化扩展
     init_extensions(app)
@@ -53,60 +60,6 @@ def create_app(config_name='development'):
         create_default_admin(app)
     
     return app
-
-def load_config(app, config_name):
-    """
-    加载应用配置
-    
-    Args:
-        app (Flask): Flask应用实例
-        config_name (str): 配置名称
-    """
-    # 基础配置
-    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['SQLALCHEMY_ECHO'] = False
-    
-    # JWT配置
-    app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'jwt-secret-change-in-production')
-    app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
-    app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(days=30)
-    app.config['JWT_ALGORITHM'] = 'HS256'
-    
-    # 数据库配置
-    if config_name == 'production':
-        app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
-            'DATABASE_URL',
-            'sqlite:///production.db'
-        )
-        app.config['DEBUG'] = False
-    elif config_name == 'testing':
-        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
-        app.config['TESTING'] = True
-        app.config['WTF_CSRF_ENABLED'] = False
-    else:  # development
-        app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
-            'DATABASE_URL',
-            'sqlite:///development.db'
-        )
-        app.config['DEBUG'] = True
-    
-    # 加密配置
-    app.config['ENCRYPTION_KEY'] = os.environ.get('ENCRYPTION_KEY', 'default-encryption-key')
-    
-    # API限流配置
-    app.config['RATELIMIT_STORAGE_URL'] = 'memory://'
-    app.config['RATELIMIT_DEFAULT'] = '1000 per hour'
-    
-    # CORS配置
-    app.config['CORS_ORIGINS'] = os.environ.get('CORS_ORIGINS', '*').split(',')
-    
-    # 文件上传配置
-    app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
-    
-    # 日志配置
-    app.config['LOG_LEVEL'] = os.environ.get('LOG_LEVEL', 'INFO')
-    app.config['LOG_FILE'] = os.environ.get('LOG_FILE', 'logs/app.log')
 
 def init_extensions(app):
     """
@@ -143,10 +96,10 @@ def init_extensions(app):
     
     # 初始化限流器
     limiter = Limiter(
-        app,
         key_func=get_remote_address,
         default_limits=[app.config['RATELIMIT_DEFAULT']]
     )
+    limiter.init_app(app)
     
     # 限流错误处理
     @app.errorhandler(429)
@@ -164,8 +117,26 @@ def register_blueprints(app):
     Args:
         app (Flask): Flask应用实例
     """
-    # 注册API蓝图
-    app.register_blueprint(api_bp, url_prefix='/api/v1')
+    try:
+        # 导入所有蓝图
+        from app.api import auth_bp, repository_bp, analytics_bp
+        
+        # 注册各个功能模块的蓝图
+        app.register_blueprint(auth_bp, url_prefix='/api/auth')
+        app.register_blueprint(repository_bp, url_prefix='/api/repositories')
+        app.register_blueprint(analytics_bp, url_prefix='/api/analytics')
+        
+        print(f"蓝图注册成功: auth_bp, repository_bp, analytics_bp")
+        
+        # 打印所有注册的路由
+        print("已注册的路由:")
+        for rule in app.url_map.iter_rules():
+            print(f"  {rule.rule} -> {rule.endpoint} [{', '.join(rule.methods)}]")
+        
+    except Exception as e:
+        print(f"蓝图注册失败: {str(e)}")
+        import traceback
+        traceback.print_exc()
     
     # 健康检查端点
     @app.route('/health')
@@ -218,7 +189,7 @@ def register_error_handlers(app):
     @app.errorhandler(404)
     def not_found(error):
         """处理404错误"""
-        return error_response("资源不存在", status_code=404)
+        return jsonify({"error": "Resource not found", "path": request.path}), 404
     
     @app.errorhandler(405)
     def method_not_allowed(error):
@@ -310,40 +281,8 @@ def create_default_admin(app):
         app.logger.error(f"创建默认管理员账户失败: {str(e)}")
         db.session.rollback()
 
-# 请求前处理
-@api_bp.before_request
-def before_request():
-    """
-    请求前处理
-    记录请求信息，验证内容类型等
-    """
-    # 记录请求信息
-    if request.method in ['POST', 'PUT', 'PATCH']:
-        if request.content_type and 'application/json' not in request.content_type:
-            return validation_error_response("请求内容类型必须为application/json")
-
-# 请求后处理
-@api_bp.after_request
-def after_request(response):
-    """
-    请求后处理
-    添加安全头部，记录响应信息等
-    
-    Args:
-        response: Flask响应对象
-    
-    Returns:
-        Flask响应对象
-    """
-    # 添加安全头部
-    response.headers['X-Content-Type-Options'] = 'nosniff'
-    response.headers['X-Frame-Options'] = 'DENY'
-    response.headers['X-XSS-Protection'] = '1; mode=block'
-    
-    # 添加API版本头部
-    response.headers['X-API-Version'] = '1.0.0'
-    
-    return response
+# 移除全局的before_request和after_request装饰器
+# 这些功能现在由各个蓝图自己处理
 
 if __name__ == '__main__':
     from datetime import datetime

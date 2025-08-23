@@ -7,6 +7,7 @@ import 'element-plus/dist/index.css'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
 import './styles/index.scss'
+import { getToken, getRefreshToken } from '@/utils/auth'
 
 // 创建Vue应用实例
 const app = createApp(App)
@@ -22,6 +23,16 @@ app.use(router)
 app.use(ElementPlus, {
   locale: zhCn
 })
+
+// 初始化认证状态 - 从Cookie中恢复token
+const token = getToken()
+const refreshToken = getRefreshToken()
+if (token) {
+  store.commit('auth/SET_TOKEN', token)
+}
+if (refreshToken) {
+  store.commit('auth/SET_REFRESH_TOKEN', refreshToken)
+}
 
 // 挂载应用
 app.mount('#app')

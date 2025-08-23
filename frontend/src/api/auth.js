@@ -1,4 +1,5 @@
 import request from './index'
+import { getRefreshToken } from '@/utils/auth'
 
 /**
  * 用户登录
@@ -37,7 +38,7 @@ export function register(data) {
  */
 export function getUserInfo() {
   return request({
-    url: '/auth/user',
+    url: '/auth/profile',
     method: 'get'
   })
 }
@@ -58,9 +59,19 @@ export function logout() {
  * @returns {Promise} 刷新Token响应
  */
 export function refreshToken() {
+  // 获取refresh token
+  const refreshTokenValue = getRefreshToken()
+  
+  if (!refreshTokenValue) {
+    return Promise.reject(new Error('Refresh token not found'))
+  }
+  
   return request({
     url: '/auth/refresh',
-    method: 'post'
+    method: 'post',
+    headers: {
+      'Authorization': `Bearer ${refreshTokenValue}`
+    }
   })
 }
 

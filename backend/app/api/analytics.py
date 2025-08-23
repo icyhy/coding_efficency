@@ -47,12 +47,18 @@ def get_analytics_overview(current_user):
         end_date_str = request.args.get('end_date')
         repository_ids_str = request.args.get('repository_ids')
         
-        # 解析日期范围
-        start_date, end_date = get_date_range_by_params(
-            start_date_str,
-            end_date_str,
-            30
-        )
+        # 解析日期范围（使用严格模式验证日期格式）
+        try:
+            # 如果没有提供日期参数，使用默认30天
+            days_param = 30 if not start_date_str and not end_date_str else None
+            start_date, end_date = get_date_range_by_params(
+                start_date_str,
+                end_date_str,
+                days_param,
+                strict=True
+            )
+        except ValueError as e:
+            return error_response(str(e), status_code=400)
         
         # 解析仓库ID列表
         repository_ids = None
@@ -173,12 +179,18 @@ def get_commits_analytics(current_user):
         group_by = request.args.get('group_by', 'day')
         author_email = request.args.get('author_email')
         
-        # 解析日期范围
-        start_date, end_date = get_date_range_by_params(
-            start_date_str,
-            end_date_str,
-            30
-        )
+        # 解析日期范围（使用严格模式验证日期格式）
+        try:
+            # 如果没有提供日期参数，使用默认30天
+            days_param = 30 if not start_date_str and not end_date_str else None
+            start_date, end_date = get_date_range_by_params(
+                start_date_str,
+                end_date_str,
+                days_param,
+                strict=True
+            )
+        except ValueError as e:
+            return error_response(str(e), status_code=400)
         
         # 解析仓库ID列表
         repository_ids = None
@@ -262,12 +274,18 @@ def get_merge_requests_analytics(current_user):
         state = request.args.get('state')
         author_email = request.args.get('author_email')
         
-        # 解析日期范围
-        start_date, end_date = get_date_range_by_params(
-            start_date_str,
-            end_date_str,
-            30
-        )
+        # 解析日期范围（使用严格模式验证日期格式）
+        try:
+            # 如果没有提供日期参数，使用默认30天
+            days_param = 30 if not start_date_str and not end_date_str else None
+            start_date, end_date = get_date_range_by_params(
+                start_date_str,
+                end_date_str,
+                days_param,
+                strict=True
+            )
+        except ValueError as e:
+            return error_response(str(e), status_code=400)
         
         # 解析仓库ID列表
         repository_ids = None
@@ -370,12 +388,18 @@ def get_efficiency_score(current_user):
             except json.JSONDecodeError:
                 return validation_error_response("评分配置格式不正确")
         
-        # 解析日期范围
-        start_date, end_date = get_date_range_by_params(
-            start_date_str,
-            end_date_str,
-            30
-        )
+        # 解析日期范围（使用严格模式验证日期格式）
+        try:
+            # 如果没有提供日期参数，使用默认30天
+            days_param = 30 if not start_date_str and not end_date_str else None
+            start_date, end_date = get_date_range_by_params(
+                start_date_str,
+                end_date_str,
+                days_param,
+                strict=True
+            )
+        except ValueError as e:
+            return error_response(str(e), status_code=400)
         
         # 解析仓库ID列表
         repository_ids = None
@@ -468,7 +492,9 @@ def get_user_analytics(user_id):
         days = request.args.get('days', 30, type=int)
         
         # 验证用户存在
-        user = User.query.get_or_404(user_id)
+        user = User.query.get(user_id)
+        if not user:
+            return not_found_response(f"用户ID {user_id} 不存在")
         
         # 使用分析服务获取统计数据
         stats = analytics_service.get_user_stats(user_id, days)
@@ -483,7 +509,8 @@ def get_user_analytics(user_id):
         })
         
     except Exception as e:
-         return jsonify({'error': str(e)}), 500
+        current_app.logger.error(f"获取用户分析数据失败: {str(e)}")
+        return error_response("获取用户分析数据失败")
 
 @api_bp.route('/team/productivity', methods=['GET'])
 @jwt_required()
@@ -590,12 +617,18 @@ def get_time_distribution(current_user):
         analysis_type = request.args.get('type', 'commits')
         dimension = request.args.get('dimension', 'hour')
         
-        # 解析日期范围
-        start_date, end_date = get_date_range_by_params(
-            start_date_str,
-            end_date_str,
-            30
-        )
+        # 解析日期范围（使用严格模式验证日期格式）
+        try:
+            # 如果没有提供日期参数，使用默认30天
+            days_param = 30 if not start_date_str and not end_date_str else None
+            start_date, end_date = get_date_range_by_params(
+                start_date_str,
+                end_date_str,
+                days_param,
+                strict=True
+            )
+        except ValueError as e:
+            return error_response(str(e), status_code=400)
         
         # 解析仓库ID列表
         repository_ids = None

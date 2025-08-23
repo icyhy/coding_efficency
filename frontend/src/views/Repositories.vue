@@ -26,13 +26,9 @@
           </el-select>
         </div>
         <div class="action-buttons">
-          <el-button type="primary" @click="showAddDialog">
-            <i class="el-icon-plus"></i>
-            添加仓库
-          </el-button>
-          <el-button @click="syncAllRepositories" :loading="syncing">
-            <i class="el-icon-refresh"></i>
-            同步所有
+          <el-button type="primary" @click="yunxiaoDialogVisible = true">
+            <i class="el-icon-search"></i>
+            查询仓库
           </el-button>
           <el-button @click="exportRepositories">
             <i class="el-icon-download"></i>
@@ -115,13 +111,40 @@
         <el-table-column prop="commits_count" label="提交数" width="100" align="right" />
         <el-table-column prop="branches_count" label="分支数" width="100" align="right" />
         <el-table-column prop="contributors_count" label="贡献者" width="100" align="right" />
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column prop="is_tracked" label="统计状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.is_tracked ? 'success' : 'info'" size="small">
+              {{ row.is_tracked ? '已纳入' : '未纳入' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
             <el-button type="text" size="small" @click="viewRepository(row)">
               查看
             </el-button>
             <el-button type="text" size="small" @click="syncRepository(row)" :loading="row.syncing">
               同步
+            </el-button>
+            <el-button 
+              v-if="!row.is_tracked" 
+              type="text" 
+              size="small" 
+              @click="addToTracking(row)"
+              :loading="row.tracking"
+              style="color: #67C23A;"
+            >
+              加入统计
+            </el-button>
+            <el-button 
+              v-else 
+              type="text" 
+              size="small" 
+              @click="removeFromTracking(row)"
+              :loading="row.tracking"
+              style="color: #F56C6C;"
+            >
+              移出统计
             </el-button>
             <el-button type="text" size="small" @click="editRepository(row)">
               编辑
@@ -144,6 +167,9 @@
                     <i class="el-icon-folder-opened"></i>
                     {{ repo.name }}
                     <el-tag v-if="repo.is_private" type="warning" size="mini">私有</el-tag>
+                    <el-tag :type="repo.is_tracked ? 'success' : 'info'" size="mini" style="margin-left: 8px;">
+                      {{ repo.is_tracked ? '已纳入统计' : '未纳入统计' }}
+                    </el-tag>
                   </h3>
                   <p class="repo-description">{{ repo.description || '暂无描述' }}</p>
                 </div>
@@ -186,6 +212,24 @@
                 </el-button>
                 <el-button size="small" @click="syncRepository(repo)" :loading="repo.syncing">
                   同步数据
+                </el-button>
+                <el-button 
+                  v-if="!repo.is_tracked" 
+                  size="small" 
+                  type="success" 
+                  @click="addToTracking(repo)"
+                  :loading="repo.tracking"
+                >
+                  加入统计
+                </el-button>
+                <el-button 
+                  v-else 
+                  size="small" 
+                  type="danger" 
+                  @click="removeFromTracking(repo)"
+                  :loading="repo.tracking"
+                >
+                  移出统计
                 </el-button>
                 <el-dropdown @command="(command) => handleRepoAction(command, repo)">
                   <el-button size="small">
@@ -233,7 +277,48 @@
         label-width="100px"
       >
         <el-form-item label="仓库名称" prop="name">
-          <el-input v-model="form.name" placeholder="请输入仓库名称" />
+          <div class="repository-name-input">
+            <el-input 
+              v-model="form.name" 
+              placeholder="请输入仓库名称（支持搜索云效仓库）"
+              @input="handleNameInput"
+              @blur="hideCandidates"
+              @focus="() => form.name && searchCandidateRepositories(form.name)"
+            >
+              <template #suffix>
+                <el-icon v-if="searchingCandidates" class="is-loading">
+                  <Loading />
+                </el-icon>
+              </template>
+            </el-input>
+            
+            <!-- 候选仓库列表 -->
+            <div v-if="showCandidates" class="candidate-repositories">
+              <div class="candidate-header">
+                <span>云效仓库候选列表</span>
+                <span class="candidate-count">{{ candidateRepositories.length }} 个结果</span>
+              </div>
+              <div class="candidate-list">
+                <div 
+                  v-for="repo in candidateRepositories" 
+                  :key="repo.id"
+                  class="candidate-item"
+                  @click="selectCandidateRepository(repo)"
+                >
+                  <div class="candidate-info">
+                    <div class="candidate-name">{{ repo.name }}</div>
+                    <div class="candidate-path">{{ repo.full_name }}</div>
+                    <div v-if="repo.description" class="candidate-desc">{{ repo.description }}</div>
+                  </div>
+                  <div class="candidate-meta">
+                    <el-tag :type="repo.visibility === 'public' ? 'success' : 'info'" size="small">
+                      {{ repo.visibility === 'public' ? '公开' : '私有' }}
+                    </el-tag>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </el-form-item>
         <el-form-item label="仓库地址" prop="url">
           <el-input v-model="form.url" placeholder="请输入Git仓库地址" />
@@ -274,6 +359,103 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 云效仓库列表对话框 -->
+    <el-dialog
+      v-model="yunxiaoDialogVisible"
+      title="查询云效仓库"
+      width="900px"
+      @close="resetYunxiaoDialog"
+    >
+      <div class="yunxiao-repos-container">
+        <!-- 搜索和操作栏 -->
+        <div class="yunxiao-header">
+          <div class="search-section">
+            <el-input
+              v-model="yunxiaoSearchKeyword"
+              placeholder="请输入仓库名称进行查询"
+              style="width: 300px; margin-right: 16px;"
+              @keyup.enter="searchYunxiaoRepos"
+              clearable
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
+            <el-button 
+              type="primary" 
+              @click="searchYunxiaoRepos"
+              :loading="loadingYunxiao"
+            >
+              搜索
+            </el-button>
+          </div>
+          <div class="action-section">
+            <span class="repo-count">共 {{ yunxiaoPagination.total }} 个仓库</span>
+            <el-button 
+              type="primary" 
+              size="small" 
+              @click="addSelectedToTracking"
+              :disabled="selectedYunxiaoRepos.length === 0"
+            >
+              加入统计 ({{ selectedYunxiaoRepos.length }})
+            </el-button>
+          </div>
+        </div>
+        
+        <el-table
+          :data="yunxiaoRepositories"
+          v-loading="loadingYunxiao"
+          @selection-change="handleYunxiaoSelection"
+          max-height="400"
+        >
+          <el-table-column type="selection" width="55" />
+          <el-table-column prop="name" label="仓库名称" min-width="150">
+            <template #default="{ row }">
+              <div class="repo-info">
+                <div class="repo-name">{{ row.name }}</div>
+                <div class="repo-path">{{ row.full_name || row.pathWithNamespace }}</div>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column prop="last_activity" label="最后活动" width="120">
+            <template #default="{ row }">
+              {{ formatDate(row.last_activity || row.lastActivityAt) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="120">
+            <template #default="{ row }">
+              <el-button 
+                type="primary" 
+                size="small" 
+                @click="addSingleToTracking(row)"
+              >
+                加入统计
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        
+        <!-- 分页组件 -->
+        <div class="yunxiao-pagination">
+          <el-pagination
+            v-model:current-page="yunxiaoPagination.page"
+            v-model:page-size="yunxiaoPagination.size"
+            :page-sizes="[10, 20, 50, 100]"
+            :total="yunxiaoPagination.total"
+            layout="total, sizes, prev, pager, next, jumper"
+            @size-change="handleYunxiaoSizeChange"
+            @current-change="handleYunxiaoPageChange"
+          />
+        </div>
+      </div>
+      
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="yunxiaoDialogVisible = false">关闭</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -281,10 +463,15 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useStore } from 'vuex'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getRepositories, addRepository, updateRepository, deleteRepository as deleteRepositoryAPI, syncRepository as syncRepositoryAPI } from '@/api/repositories'
+import { Loading, Search } from '@element-plus/icons-vue'
+import { getRepositories, addRepository, updateRepository, deleteRepository as deleteRepositoryAPI, syncRepository as syncRepositoryAPI, getYunxiaoRepositoriesAPI, addToTrackingAPI, removeFromTrackingAPI, searchYunxiaoRepositories, addYunxiaoRepository } from '@/api/repositories'
 
 export default {
   name: 'Repositories',
+  components: {
+    Loading,
+    Search
+  },
   setup() {
     const store = useStore()
 
@@ -292,6 +479,7 @@ export default {
     const loading = ref(false)
     const syncing = ref(false)
     const submitting = ref(false)
+    const loadingYunxiao = ref(false)
     const searchKeyword = ref('')
     const statusFilter = ref('')
     const viewMode = ref('table')
@@ -316,6 +504,22 @@ export default {
       access_token: '',
       auto_sync: false,
       sync_interval: 'daily'
+    })
+
+    // 候选仓库相关数据
+    const candidateRepositories = ref([])
+    const searchingCandidates = ref(false)
+    const showCandidates = ref(false)
+
+    // 云效仓库对话框相关数据
+    const yunxiaoDialogVisible = ref(false)
+    const yunxiaoRepositories = ref([])
+    const selectedYunxiaoRepos = ref([])
+    const yunxiaoSearchKeyword = ref('')
+    const yunxiaoPagination = reactive({
+      page: 1,
+      size: 20,
+      total: 0
     })
 
     const formRules = {
@@ -370,11 +574,13 @@ export default {
             url: repo.url,
             status: repo.is_active ? 'active' : 'paused',
             is_private: repo.platform === 'yunxiao', // 阿里云效仓库默认为私有
+            is_tracked: repo.is_tracked || false, // 是否纳入统计
             last_sync: repo.last_sync_at ? new Date(repo.last_sync_at) : null,
             commits_count: repo.stats?.commits_count || 0,
             branches_count: 0, // API暂不提供分支数
             contributors_count: 0, // API暂不提供贡献者数
-            syncing: repo.sync_status === 'syncing'
+            syncing: repo.sync_status === 'syncing',
+            tracking: false // 加入/移出统计操作的loading状态
           }))
           
           pagination.total = response.data.data.total
@@ -489,6 +695,277 @@ export default {
       form.auto_sync = false
       form.sync_interval = 'daily'
       formRef.value?.resetFields()
+      // 重置候选仓库相关状态
+      candidateRepositories.value = []
+      showCandidates.value = false
+    }
+
+    // 搜索候选仓库
+    const searchCandidateRepositories = async (query) => {
+      if (!query || query.length < 2) {
+        candidateRepositories.value = []
+        showCandidates.value = false
+        return
+      }
+
+      try {
+        searchingCandidates.value = true
+        const response = await searchYunxiaoRepositories({
+          search: query,
+          page: 1,
+          per_page: 10
+        })
+        
+        if (response.data && response.data.success) {
+          candidateRepositories.value = response.data.data.repositories || []
+          showCandidates.value = candidateRepositories.value.length > 0
+        } else {
+          candidateRepositories.value = []
+          showCandidates.value = false
+        }
+      } catch (error) {
+        console.error('搜索候选仓库失败:', error)
+        candidateRepositories.value = []
+        showCandidates.value = false
+        // 不显示错误消息，避免干扰用户输入体验
+      } finally {
+        searchingCandidates.value = false
+      }
+    }
+
+    // 选择候选仓库
+    const selectCandidateRepository = (repo) => {
+      form.name = repo.name
+      form.url = repo.clone_url || repo.url
+      form.description = repo.description
+      showCandidates.value = false
+      candidateRepositories.value = []
+    }
+
+    // 处理仓库名称输入
+    const handleNameInput = (value) => {
+      form.name = value
+      // 防抖搜索
+      clearTimeout(handleNameInput.timer)
+      handleNameInput.timer = setTimeout(() => {
+        searchCandidateRepositories(value)
+      }, 300)
+    }
+
+    // 隐藏候选列表
+    const hideCandidates = () => {
+      setTimeout(() => {
+        showCandidates.value = false
+      }, 200) // 延迟隐藏，允许点击候选项
+    }
+
+    // 云效仓库对话框相关方法
+    const resetYunxiaoDialog = () => {
+      yunxiaoRepositories.value = []
+      selectedYunxiaoRepos.value = []
+      yunxiaoSearchKeyword.value = ''
+      yunxiaoPagination.page = 1
+      yunxiaoPagination.total = 0
+    }
+
+    const handleYunxiaoSelection = (selection) => {
+      selectedYunxiaoRepos.value = selection
+    }
+
+    const addSingleToTracking = async (repo) => {
+      try {
+        const targetUrl = repo.clone_url || repo.url
+        let targetRepoId = null
+
+        // 优先在本地列表中查找
+        const local = repositories.value.find(r => r.url === targetUrl)
+        if (local) {
+          targetRepoId = local.id
+        }
+
+        // 若未找到，调用后端检索
+        if (!targetRepoId) {
+          try {
+            const res = await getRepositories({ search: targetUrl, page: 1, per_page: 1 })
+            if (res && res.success && res.data?.items?.length) {
+              targetRepoId = res.data.items[0].id
+            }
+          } catch (error) {
+            console.warn('查询仓库失败，可能是认证问题，直接尝试创建:', error.message)
+            // 忽略查询错误，继续尝试创建
+          }
+        }
+
+        // 若仍未找到，则创建后获取ID
+        if (!targetRepoId) {
+          // 确保必需字段不为空
+          const cloneUrl = repo.clone_url || repo.url || ''
+          if (!cloneUrl) {
+            throw new Error('仓库缺少克隆地址，无法添加')
+          }
+          
+          try {
+            const createResp = await addYunxiaoRepository({
+              repository_id: repo.id,
+              name: repo.name || '未命名仓库',
+              clone_url: cloneUrl,
+              web_url: repo.url || cloneUrl,
+              description: repo.description || ''
+            })
+            if (createResp && createResp.success) {
+              targetRepoId = createResp.data?.id
+            }
+          } catch (createError) {
+            // 如果是409冲突错误，说明仓库已存在，尝试重新查询
+            if (createError.response?.status === 409) {
+              console.log('仓库已存在，重新查询仓库ID')
+              try {
+                const retry = await getRepositories({ search: targetUrl, page: 1, per_page: 1 })
+                if (retry && retry.success && retry.data?.items?.length) {
+                  targetRepoId = retry.data.items[0].id
+                }
+              } catch (retryError) {
+                console.warn('重试查询仓库失败:', retryError.message)
+              }
+            } else {
+              throw createError
+            }
+          }
+        }
+
+        if (!targetRepoId) {
+          throw new Error('未找到仓库ID，无法加入统计')
+        }
+
+        const trackResp = await addToTrackingAPI(targetRepoId)
+        if (trackResp && trackResp.success) {
+          ElMessage.success(`仓库 ${repo.name} 已加入统计`)
+          loadRepositories()
+        } else {
+          throw new Error(trackResp?.message || '加入统计失败')
+        }
+      } catch (error) {
+        console.error('加入统计失败:', error)
+        ElMessage.error(`仓库 ${repo.name} 加入统计失败: ${error.message || '请重试'}`)
+      }
+    }
+
+    const addSelectedToTracking = async () => {
+      if (selectedYunxiaoRepos.value.length === 0) {
+        ElMessage.warning('请先选择要加入统计的仓库')
+        return
+      }
+
+      try {
+        const results = await Promise.all(selectedYunxiaoRepos.value.map(async (repo) => {
+          try {
+            const targetUrl = repo.clone_url || repo.url
+            let repoId = null
+
+            // 本地列表匹配
+            const local = repositories.value.find(r => r.url === targetUrl)
+            if (local) repoId = local.id
+
+            // 后端检索
+            if (!repoId) {
+              try {
+                const res = await getRepositories({ search: targetUrl, page: 1, per_page: 1 })
+                if (res && res.success && res.data?.items?.length) {
+                  repoId = res.data.items[0].id
+                }
+              } catch (error) {
+                console.warn('查询仓库失败，可能是认证问题，直接尝试创建:', error.message)
+                // 忽略查询错误，继续尝试创建
+              }
+            }
+
+            // 若仍未找到，则创建后获取ID
+            if (!repoId) {
+              // 确保必需字段不为空
+              const cloneUrl = repo.clone_url || repo.url || ''
+              if (!cloneUrl) {
+                throw new Error('仓库缺少克隆地址，无法添加')
+              }
+              
+              try {
+                const createResp = await addYunxiaoRepository({
+                  repository_id: repo.id,
+                  name: repo.name || '未命名仓库',
+                  clone_url: cloneUrl,
+                  web_url: repo.url || cloneUrl,
+                  description: repo.description || ''
+                })
+                if (createResp && createResp.success) {
+                  repoId = createResp.data?.id
+                }
+              } catch (createError) {
+                // 如果是409冲突错误，说明仓库已存在，尝试重新查询
+                if (createError.response?.status === 409) {
+                  console.log('仓库已存在，重新查询仓库ID')
+                  try {
+                    const retry = await getRepositories({ search: targetUrl, page: 1, per_page: 1 })
+                    if (retry && retry.success && retry.data?.items?.length) {
+                      repoId = retry.data.items[0].id
+                    }
+                  } catch (retryError) {
+                    console.warn('重试查询仓库失败:', retryError.message)
+                  }
+                } else {
+                  throw createError
+                }
+              }
+            }
+
+            if (!repoId) throw new Error('未找到仓库ID')
+            const trackResp = await addToTrackingAPI(repoId)
+            if (!(trackResp && trackResp.success)) throw new Error(trackResp?.message || '加入统计失败')
+            return true
+          } catch (e) {
+            return false
+          }
+        }))
+
+        const successCount = results.filter(Boolean).length
+        const failCount = results.length - successCount
+        if (successCount > 0) {
+          ElMessage.success(`成功加入 ${successCount} 个仓库到统计${failCount > 0 ? `，${failCount} 个失败` : ''}`)
+          loadRepositories()
+          yunxiaoDialogVisible.value = false
+        } else {
+          ElMessage.error('所有仓库加入统计失败')
+        }
+      } catch (error) {
+        console.error('批量加入统计失败:', error)
+        ElMessage.error('批量加入统计失败，请重试')
+      }
+    }
+
+    // 云效仓库搜索处理
+    const handleYunxiaoSearch = () => {
+      // 防抖处理，避免频繁请求
+      clearTimeout(handleYunxiaoSearch.timer)
+      handleYunxiaoSearch.timer = setTimeout(() => {
+        searchYunxiaoRepos()
+      }, 500)
+    }
+
+    // 搜索云效仓库
+    const searchYunxiaoRepos = () => {
+      yunxiaoPagination.page = 1 // 重置到第一页
+      getYunxiaoRepositories()
+    }
+
+    // 云效仓库分页大小变化
+    const handleYunxiaoSizeChange = (size) => {
+      yunxiaoPagination.size = size
+      yunxiaoPagination.page = 1 // 重置到第一页
+      getYunxiaoRepositories()
+    }
+
+    // 云效仓库页码变化
+    const handleYunxiaoPageChange = (page) => {
+      yunxiaoPagination.page = page
+      getYunxiaoRepositories()
     }
 
     const submitForm = async () => {
@@ -564,20 +1041,85 @@ export default {
       }
     }
 
-    const syncAllRepositories = async () => {
+    // 搜索云效仓库
+    const getYunxiaoRepositories = async () => {
       try {
-        syncing.value = true
+        // 检查搜索关键词是否为空
+        if (!yunxiaoSearchKeyword.value || yunxiaoSearchKeyword.value.trim() === '') {
+          ElMessage.warning('请输入仓库名称进行查询')
+          return
+        }
         
-        // 模拟批量同步
-        await new Promise(resolve => setTimeout(resolve, 3000))
+        loadingYunxiao.value = true
         
-        ElMessage.success('所有仓库同步完成')
-        loadRepositories()
+        const response = await getYunxiaoRepositoriesAPI({
+          page: yunxiaoPagination.page,
+          per_page: yunxiaoPagination.size,
+          search: yunxiaoSearchKeyword.value.trim()
+        })
+        
+        if (response && response.success) {
+          const yunxiaoRepos = response.data.items || []  // 使用items字段
+          yunxiaoPagination.total = response.data.pagination?.total || 0
+          
+          if (yunxiaoRepos.length === 0) {
+            ElMessage.info('未找到匹配的仓库，请尝试其他关键词')
+          } else {
+            ElMessage.success(`找到 ${yunxiaoRepos.length} 个匹配的仓库`)
+          }
+          
+          // 更新仓库列表
+          yunxiaoRepositories.value = yunxiaoRepos
+          console.log('云效仓库搜索结果:', yunxiaoRepos)
+        } else {
+          throw new Error(response?.message || '搜索云效仓库失败')
+        }
         
       } catch (error) {
-        ElMessage.error('批量同步失败')
+        console.error('搜索云效仓库失败:', error)
+        ElMessage.error(`搜索云效仓库失败: ${error.message || '请重试'}`)
       } finally {
-        syncing.value = false
+        loadingYunxiao.value = false
+      }
+    }
+
+    // 加入统计
+    const addToTracking = async (repo) => {
+      try {
+        repo.tracking = true
+        const response = await addToTrackingAPI(repo.id)
+        if (response && response.success) {
+          repo.is_tracked = true
+          ElMessage.success(`仓库 ${repo.name} 已加入统计`)
+          loadRepositories()
+        } else {
+          throw new Error(response?.message || '加入统计失败')
+        }
+      } catch (error) {
+        console.error('加入统计失败:', error)
+        ElMessage.error(`仓库 ${repo.name} 加入统计失败: ${error.message || '请重试'}`)
+      } finally {
+        repo.tracking = false
+      }
+    }
+
+    // 移出统计
+    const removeFromTracking = async (repo) => {
+      try {
+        repo.tracking = true
+        const response = await removeFromTrackingAPI(repo.id)
+        if (response && response.success) {
+          repo.is_tracked = false
+          ElMessage.success(`仓库 ${repo.name} 已移出统计`)
+          loadRepositories()
+        } else {
+          throw new Error(response?.message || '移出统计失败')
+        }
+      } catch (error) {
+        console.error('移出统计失败:', error)
+        ElMessage.error(`仓库 ${repo.name} 移出统计失败: ${error.message || '请重试'}`)
+      } finally {
+        repo.tracking = false
       }
     }
 
@@ -676,6 +1218,7 @@ export default {
       loading,
       syncing,
       submitting,
+      loadingYunxiao,
       searchKeyword,
       statusFilter,
       viewMode,
@@ -688,13 +1231,18 @@ export default {
       form,
       formRules,
       filteredRepositories,
+      candidateRepositories,
+      searchingCandidates,
+      showCandidates,
       handleSearch,
       showAddDialog,
       editRepository,
       resetForm,
       submitForm,
       syncRepository,
-      syncAllRepositories,
+      getYunxiaoRepositories,
+      addToTracking,
+      removeFromTracking,
       deleteRepository,
       viewRepository,
       handleRepoAction,
@@ -704,7 +1252,25 @@ export default {
       getStatusType,
       getStatusText,
       formatDate,
-      updateStats
+      updateStats,
+      searchCandidateRepositories,
+      selectCandidateRepository,
+      handleNameInput,
+      hideCandidates,
+      // 云效仓库对话框相关
+      yunxiaoDialogVisible,
+      yunxiaoRepositories,
+      selectedYunxiaoRepos,
+      yunxiaoSearchKeyword,
+      yunxiaoPagination,
+      resetYunxiaoDialog,
+      handleYunxiaoSelection,
+      addSingleToTracking,
+      addSelectedToTracking,
+      handleYunxiaoSearch,
+      searchYunxiaoRepos,
+      handleYunxiaoSizeChange,
+      handleYunxiaoPageChange
     }
   }
 }
@@ -715,6 +1281,129 @@ export default {
 @import '@/styles/mixins.scss';
 .repositories {
   padding: 24px;
+}
+
+/* 候选仓库相关样式 */
+.repository-name-input {
+  position: relative;
+}
+
+.candidate-repositories {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.candidate-header {
+  padding: 8px 12px;
+  background-color: #f5f7fa;
+  border-bottom: 1px solid #ebeef5;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #909399;
+}
+
+.candidate-count {
+  font-weight: 500;
+}
+
+.candidate-list {
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.candidate-item {
+  padding: 12px;
+  border-bottom: 1px solid #f0f2f5;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  transition: background-color 0.2s;
+}
+
+.candidate-item:hover {
+  background-color: #f5f7fa;
+}
+
+.candidate-item:last-child {
+  border-bottom: none;
+}
+
+.candidate-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.candidate-name {
+  font-weight: 500;
+  color: #303133;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.candidate-path {
+  color: #909399;
+  font-size: 12px;
+  margin-bottom: 4px;
+  word-break: break-all;
+}
+
+.candidate-desc {
+  color: #606266;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.candidate-meta {
+  margin-left: 12px;
+  flex-shrink: 0;
+}
+
+/* 云效仓库对话框样式 */
+.yunxiao-repos-container {
+  .yunxiao-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding: 12px 0;
+    border-bottom: 1px solid #ebeef5;
+    
+    span {
+      font-size: 14px;
+      color: #606266;
+      font-weight: 500;
+    }
+  }
+  
+  .repo-info {
+    .repo-name {
+      font-weight: 500;
+      color: #303133;
+      margin-bottom: 4px;
+    }
+    
+    .repo-path {
+      font-size: 12px;
+      color: #909399;
+    }
+  }
 }
 
 .page-header {

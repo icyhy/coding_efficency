@@ -287,37 +287,59 @@
         </el-card>
 
         <!-- 集成配置 -->
-        <el-card v-show="activeTab === 'integration'" class="content-card">
+        <el-card v-show="activeTab === 'integration'" class="content-card" v-loading="loadingIntegrations">
           <template #header>
             <div class="card-header">
               <span class="card-title">集成配置</span>
-              <el-button type="primary" @click="saveIntegrationSettings" :loading="saving">
-                保存配置
-              </el-button>
+              <div>
+                <el-button @click="loadIntegrationSettings" :loading="loadingIntegrations">
+                  刷新
+                </el-button>
+                <el-button type="primary" @click="saveIntegrationSettings" :loading="saving">
+                  保存配置
+                </el-button>
+              </div>
             </div>
           </template>
           
           <div class="integration-section">
             <div class="integration-item">
               <div class="item-header">
-                <h3>阿里云效</h3>
-                <el-switch v-model="integrationSettings.codeup.enabled" />
+                <div class="header-left">
+                  <h3>阿里云效</h3>
+                  <el-tag v-if="integrationSettings.yunxiao.test_status === 'success'" type="success" size="small">
+                    连接正常
+                  </el-tag>
+                  <el-tag v-else-if="integrationSettings.yunxiao.test_status === 'failed'" type="danger" size="small">
+                    连接失败
+                  </el-tag>
+                  <el-tag v-else type="info" size="small">
+                    未测试
+                  </el-tag>
+                </div>
+                <el-switch v-model="integrationSettings.yunxiao.enabled" />
               </div>
-              <div v-if="integrationSettings.codeup.enabled" class="item-config">
+              <div v-if="integrationSettings.yunxiao.enabled" class="item-config">
                 <el-form label-width="120px">
+                  <el-form-item label="配置名称">
+                    <el-input v-model="integrationSettings.yunxiao.config_name" placeholder="阿里云效配置" />
+                  </el-form-item>
                   <el-form-item label="API地址">
-                    <el-input v-model="integrationSettings.codeup.apiUrl" placeholder="https://codeup.aliyun.com/api/v4" />
+                    <el-input v-model="integrationSettings.yunxiao.apiUrl" placeholder="https://codeup.aliyun.com/api/v4" />
                   </el-form-item>
                   <el-form-item label="访问令牌">
-                    <el-input v-model="integrationSettings.codeup.accessToken" type="password" show-password />
+                    <el-input v-model="integrationSettings.yunxiao.accessToken" type="password" show-password placeholder="请输入访问令牌" />
                   </el-form-item>
-                  <el-form-item label="组织ID">
-                    <el-input v-model="integrationSettings.codeup.organizationId" />
+                  <el-form-item label="组织名称">
+                    <el-input v-model="integrationSettings.yunxiao.organization" placeholder="可选，组织或团队名称" />
                   </el-form-item>
                   <el-form-item>
-                    <el-button @click="testConnection('codeup')" :loading="testing">
+                    <el-button @click="testConnection('yunxiao')" :loading="testing" :disabled="!integrationSettings.yunxiao.id">
                       测试连接
                     </el-button>
+                    <span v-if="integrationSettings.yunxiao.test_message" class="test-message" :class="integrationSettings.yunxiao.test_status">
+                      {{ integrationSettings.yunxiao.test_message }}
+                    </span>
                   </el-form-item>
                 </el-form>
               </div>
@@ -327,21 +349,41 @@
             
             <div class="integration-item">
               <div class="item-header">
-                <h3>GitHub</h3>
+                <div class="header-left">
+                  <h3>GitHub</h3>
+                  <el-tag v-if="integrationSettings.github.test_status === 'success'" type="success" size="small">
+                    连接正常
+                  </el-tag>
+                  <el-tag v-else-if="integrationSettings.github.test_status === 'failed'" type="danger" size="small">
+                    连接失败
+                  </el-tag>
+                  <el-tag v-else type="info" size="small">
+                    未测试
+                  </el-tag>
+                </div>
                 <el-switch v-model="integrationSettings.github.enabled" />
               </div>
               <div v-if="integrationSettings.github.enabled" class="item-config">
                 <el-form label-width="120px">
+                  <el-form-item label="配置名称">
+                    <el-input v-model="integrationSettings.github.config_name" placeholder="GitHub配置" />
+                  </el-form-item>
                   <el-form-item label="API地址">
                     <el-input v-model="integrationSettings.github.apiUrl" placeholder="https://api.github.com" />
                   </el-form-item>
                   <el-form-item label="访问令牌">
-                    <el-input v-model="integrationSettings.github.accessToken" type="password" show-password />
+                    <el-input v-model="integrationSettings.github.accessToken" type="password" show-password placeholder="请输入Personal Access Token" />
+                  </el-form-item>
+                  <el-form-item label="组织名称">
+                    <el-input v-model="integrationSettings.github.organization" placeholder="可选，GitHub组织名称" />
                   </el-form-item>
                   <el-form-item>
-                    <el-button @click="testConnection('github')" :loading="testing">
+                    <el-button @click="testConnection('github')" :loading="testing" :disabled="!integrationSettings.github.id">
                       测试连接
                     </el-button>
+                    <span v-if="integrationSettings.github.test_message" class="test-message" :class="integrationSettings.github.test_status">
+                      {{ integrationSettings.github.test_message }}
+                    </span>
                   </el-form-item>
                 </el-form>
               </div>
@@ -351,21 +393,41 @@
             
             <div class="integration-item">
               <div class="item-header">
-                <h3>GitLab</h3>
+                <div class="header-left">
+                  <h3>GitLab</h3>
+                  <el-tag v-if="integrationSettings.gitlab.test_status === 'success'" type="success" size="small">
+                    连接正常
+                  </el-tag>
+                  <el-tag v-else-if="integrationSettings.gitlab.test_status === 'failed'" type="danger" size="small">
+                    连接失败
+                  </el-tag>
+                  <el-tag v-else type="info" size="small">
+                    未测试
+                  </el-tag>
+                </div>
                 <el-switch v-model="integrationSettings.gitlab.enabled" />
               </div>
               <div v-if="integrationSettings.gitlab.enabled" class="item-config">
                 <el-form label-width="120px">
+                  <el-form-item label="配置名称">
+                    <el-input v-model="integrationSettings.gitlab.config_name" placeholder="GitLab配置" />
+                  </el-form-item>
                   <el-form-item label="API地址">
                     <el-input v-model="integrationSettings.gitlab.apiUrl" placeholder="https://gitlab.com/api/v4" />
                   </el-form-item>
                   <el-form-item label="访问令牌">
-                    <el-input v-model="integrationSettings.gitlab.accessToken" type="password" show-password />
+                    <el-input v-model="integrationSettings.gitlab.accessToken" type="password" show-password placeholder="请输入Personal Access Token" />
+                  </el-form-item>
+                  <el-form-item label="组织名称">
+                    <el-input v-model="integrationSettings.gitlab.organization" placeholder="可选，GitLab组织或群组名称" />
                   </el-form-item>
                   <el-form-item>
-                    <el-button @click="testConnection('gitlab')" :loading="testing">
+                    <el-button @click="testConnection('gitlab')" :loading="testing" :disabled="!integrationSettings.gitlab.id">
                       测试连接
                     </el-button>
+                    <span v-if="integrationSettings.gitlab.test_message" class="test-message" :class="integrationSettings.gitlab.test_status">
+                      {{ integrationSettings.gitlab.test_message }}
+                    </span>
                   </el-form-item>
                 </el-form>
               </div>
@@ -557,6 +619,7 @@
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { authApi } from '@/api/integration'
 
 export default {
   name: 'Settings',
@@ -568,12 +631,14 @@ export default {
     const backing = ref(false)
     const changing = ref(false)
     const loadingBackups = ref(false)
+    const loadingIntegrations = ref(false)
     const changePasswordVisible = ref(false)
     
     const profileFormRef = ref(null)
     const passwordFormRef = ref(null)
     
     const backupList = ref([])
+    const integrationConfigs = ref([])
 
     // 个人资料表单
     const profileForm = reactive({
@@ -660,21 +725,35 @@ export default {
 
     // 集成设置
     const integrationSettings = reactive({
-      codeup: {
+      yunxiao: {
+        id: null,
         enabled: false,
+        config_name: '阿里云效配置',
         apiUrl: 'https://codeup.aliyun.com/api/v4',
         accessToken: '',
-        organizationId: ''
+        organization: '',
+        test_status: 'pending',
+        test_message: ''
       },
       github: {
+        id: null,
         enabled: false,
+        config_name: 'GitHub配置',
         apiUrl: 'https://api.github.com',
-        accessToken: ''
+        accessToken: '',
+        organization: '',
+        test_status: 'pending',
+        test_message: ''
       },
       gitlab: {
+        id: null,
         enabled: false,
+        config_name: 'GitLab配置',
         apiUrl: 'https://gitlab.com/api/v4',
-        accessToken: ''
+        accessToken: '',
+        organization: '',
+        test_status: 'pending',
+        test_message: ''
       }
     })
 
@@ -779,14 +858,90 @@ export default {
       }
     }
 
+    // 加载集成配置
+    const loadIntegrationSettings = async () => {
+      try {
+        loadingIntegrations.value = true
+        const response = await authApi.getIntegrations()
+        
+        if (response.success) {
+          const configs = response.data.integrations || []
+          
+          // 重置所有配置
+          Object.keys(integrationSettings).forEach(platform => {
+            integrationSettings[platform].enabled = false
+            integrationSettings[platform].id = null
+            integrationSettings[platform].accessToken = ''
+            integrationSettings[platform].organization = ''
+            integrationSettings[platform].test_status = 'pending'
+            integrationSettings[platform].test_message = ''
+          })
+          
+          // 填充已保存的配置
+          configs.forEach(config => {
+            const platform = config.platform
+            if (integrationSettings[platform]) {
+              integrationSettings[platform].id = config.id
+              integrationSettings[platform].enabled = config.is_active
+              integrationSettings[platform].config_name = config.config_name
+              integrationSettings[platform].apiUrl = config.api_url
+              integrationSettings[platform].organization = config.organization || ''
+              integrationSettings[platform].test_status = config.test_status || 'pending'
+              integrationSettings[platform].test_message = config.test_message || ''
+              // 注意：出于安全考虑，不从后端加载访问令牌
+            }
+          })
+        }
+      } catch (error) {
+        console.error('加载集成配置失败:', error)
+        ElMessage.error('加载集成配置失败')
+      } finally {
+        loadingIntegrations.value = false
+      }
+    }
+
     const saveIntegrationSettings = async () => {
       try {
         saving.value = true
         
-        // 模拟保存
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        // 保存所有启用的集成配置
+        const savePromises = []
         
-        ElMessage.success('集成配置保存成功')
+        Object.keys(integrationSettings).forEach(platform => {
+          const config = integrationSettings[platform]
+          if (config.enabled && config.accessToken.trim()) {
+            const configData = {
+              platform: platform,
+              config_name: config.config_name,
+              api_url: config.apiUrl,
+              access_token: config.accessToken,
+              organization: config.organization || null
+            }
+            
+            if (config.id) {
+              // 更新现有配置
+              savePromises.push(authApi.updateIntegration(config.id, configData))
+            } else {
+              // 创建新配置
+              savePromises.push(authApi.createIntegration(configData))
+            }
+          } else if (config.id && !config.enabled) {
+            // 删除已禁用的配置
+            savePromises.push(authApi.deleteIntegration(config.id))
+          }
+        })
+        
+        if (savePromises.length > 0) {
+          await Promise.all(savePromises)
+          ElMessage.success('集成配置保存成功')
+          // 重新加载配置
+          await loadIntegrationSettings()
+        } else {
+          ElMessage.info('没有需要保存的配置')
+        }
+      } catch (error) {
+        console.error('保存集成配置失败:', error)
+        ElMessage.error('保存集成配置失败')
       } finally {
         saving.value = false
       }
@@ -794,13 +949,30 @@ export default {
 
     const testConnection = async (platform) => {
       try {
+        const config = integrationSettings[platform]
+        if (!config.id) {
+          ElMessage.warning('请先保存配置后再测试连接')
+          return
+        }
+        
         testing.value = true
         
-        // 模拟测试连接
-        await new Promise(resolve => setTimeout(resolve, 2000))
+        const response = await authApi.testIntegration(config.id)
         
-        ElMessage.success(`${platform} 连接测试成功`)
+        if (response.success) {
+          config.test_status = response.data.test_status
+          config.test_message = response.data.test_message
+          
+          if (response.data.test_status === 'success') {
+            ElMessage.success(`${platform} 连接测试成功`)
+          } else {
+            ElMessage.error(`${platform} 连接测试失败: ${response.data.test_message}`)
+          }
+        } else {
+          ElMessage.error(`${platform} 连接测试失败`)
+        }
       } catch (error) {
+        console.error('测试连接失败:', error)
         ElMessage.error(`${platform} 连接测试失败`)
       } finally {
         testing.value = false
@@ -911,6 +1083,7 @@ export default {
     // 生命周期
     onMounted(() => {
       loadBackupList()
+      loadIntegrationSettings()
     })
 
     return {
@@ -920,10 +1093,12 @@ export default {
       backing,
       changing,
       loadingBackups,
+      loadingIntegrations,
       changePasswordVisible,
       profileFormRef,
       passwordFormRef,
       backupList,
+      integrationConfigs,
       profileForm,
       profileRules,
       passwordForm,
@@ -943,6 +1118,7 @@ export default {
       showSessionsDialog,
       saveNotificationSettings,
       saveSystemSettings,
+      loadIntegrationSettings,
       saveIntegrationSettings,
       testConnection,
       createBackup,
@@ -1077,6 +1253,12 @@ export default {
       align-items: center;
       margin-bottom: 16px;
       
+      .header-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      
       h3 {
         font-size: 16px;
         font-weight: 600;
@@ -1089,6 +1271,23 @@ export default {
       background: $bg-color-light;
       padding: 16px;
       border-radius: 8px;
+    }
+  }
+  
+  .test-message {
+    margin-left: 12px;
+    font-size: 12px;
+    
+    &.success {
+      color: $success-color;
+    }
+    
+    &.failed {
+      color: $danger-color;
+    }
+    
+    &.pending {
+      color: $text-color-secondary;
     }
   }
 }

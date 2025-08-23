@@ -1,9 +1,10 @@
-import { login, getUserInfo, logout } from '@/api/auth'
-import { getToken, setToken, removeToken } from '@/utils/auth'
+import { login, getUserInfo, logout, refreshToken } from '@/api/auth'
+import { getToken, setToken, removeToken, getRefreshToken, setRefreshToken } from '@/utils/auth'
 import router from '@/router'
 
 const state = {
   token: getToken(),
+  refreshToken: getRefreshToken(),
   user: null,
   permissions: []
 }
@@ -11,6 +12,9 @@ const state = {
 const mutations = {
   SET_TOKEN(state, token) {
     state.token = token
+  },
+  SET_REFRESH_TOKEN(state, refreshToken) {
+    state.refreshToken = refreshToken
   },
   SET_USER(state, user) {
     state.user = user
@@ -20,6 +24,7 @@ const mutations = {
   },
   CLEAR_AUTH(state) {
     state.token = null
+    state.refreshToken = null
     state.user = null
     state.permissions = []
   }
@@ -38,6 +43,7 @@ const actions = {
       
       // 后端返回的数据结构中token包含在用户数据中
       const token = userData.access_token
+      const refreshTokenValue = userData.refresh_token
       const user = {
         id: userData.id,
         username: userData.username,
@@ -48,8 +54,12 @@ const actions = {
       }
       
       commit('SET_TOKEN', token)
+      commit('SET_REFRESH_TOKEN', refreshTokenValue)
       commit('SET_USER', user)
       setToken(token)
+      if (refreshTokenValue) {
+        setRefreshToken(refreshTokenValue)
+      }
       
       return response
     } catch (error) {
@@ -98,6 +108,32 @@ const actions = {
   },
 
   /**
+   * 刷新Token
+   * @param {Object} context - Vuex上下文
+   */
+  async refreshToken({ commit, state }) {
+    try {
+      if (!state.refreshToken) {
+        throw new Error('Refresh Token不存在')
+      }
+      
+      const response = await refreshToken()
+      const { access_token } = response.data
+      
+      commit('SET_TOKEN', access_token)
+      setToken(access_token)
+      
+      // 注意：后端只返回新的access_token，refresh_token保持不变
+      return access_token
+    } catch (error) {
+      // 刷新失败，清除所有认证信息
+      commit('CLEAR_AUTH')
+      removeToken()
+      throw error
+    }
+  },
+
+  /**
    * 重置Token
    * @param {Object} context - Vuex上下文
    */
@@ -109,6 +145,7 @@ const actions = {
 
 const getters = {
   token: state => state.token,
+  refreshToken: state => state.refreshToken,
   user: state => state.user,
   permissions: state => state.permissions,
   isLoggedIn: state => !!state.token,

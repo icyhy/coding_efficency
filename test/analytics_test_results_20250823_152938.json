@@ -1,0 +1,233 @@
+[
+  {
+    "test_name": "用户登录",
+    "success": true,
+    "message": "登录成功，用户ID: 1",
+    "details": null,
+    "timestamp": "2025-08-23T15:29:38.334622"
+  },
+  {
+    "test_name": "分析概览 - 默认查询",
+    "success": true,
+    "message": "获取概览成功 - 仓库数: 5, 提交数: 0",
+    "details": {
+      "active_contributors": 0,
+      "code_changes": {
+        "additions": 0,
+        "deletions": 0,
+        "net_changes": 0
+      },
+      "commits_count": 0,
+      "merge_requests_count": 0,
+      "period": {
+        "end_date": "2025-08-23T07:29:38.360639Z",
+        "start_date": "2025-07-24T07:29:38.360639Z"
+      },
+      "repositories_count": 5
+    },
+    "timestamp": "2025-08-23T15:29:38.363900"
+  },
+  {
+    "test_name": "分析概览 - 参数查询",
+    "success": true,
+    "message": "带参数查询成功",
+    "details": {
+      "active_contributors": 0,
+      "code_changes": {
+        "additions": 0,
+        "deletions": 0,
+        "net_changes": 0
+      },
+      "commits_count": 0,
+      "merge_requests_count": 0,
+      "period": {
+        "end_date": "2025-08-23T07:29:38.366143Z",
+        "start_date": "2025-07-24T07:29:38.366143Z"
+      },
+      "repositories_count": 5
+    },
+    "timestamp": "2025-08-23T15:29:38.367745"
+  },
+  {
+    "test_name": "提交统计 - 默认查询",
+    "success": true,
+    "message": "获取提交统计成功 - 总数: 0",
+    "details": {
+      "group_by": "day",
+      "items": []
+    },
+    "timestamp": "2025-08-23T15:29:38.371461"
+  },
+  {
+    "test_name": "提交统计 - day分组",
+    "success": true,
+    "message": "按day分组查询成功",
+    "details": null,
+    "timestamp": "2025-08-23T15:29:38.374492"
+  },
+  {
+    "test_name": "提交统计 - week分组",
+    "success": true,
+    "message": "按week分组查询成功",
+    "details": null,
+    "timestamp": "2025-08-23T15:29:38.377630"
+  },
+  {
+    "test_name": "提交统计 - month分组",
+    "success": true,
+    "message": "按month分组查询成功",
+    "details": null,
+    "timestamp": "2025-08-23T15:29:38.380502"
+  },
+  {
+    "test_name": "提交统计 - author分组",
+    "success": true,
+    "message": "按author分组查询成功",
+    "details": null,
+    "timestamp": "2025-08-23T15:29:38.383738"
+  },
+  {
+    "test_name": "合并请求统计 - 默认查询",
+    "success": true,
+    "message": "获取合并请求统计成功 - 总数: 0",
+    "details": {
+      "group_by": "day",
+      "items": []
+    },
+    "timestamp": "2025-08-23T15:29:38.386625"
+  },
+  {
+    "test_name": "合并请求统计 - opened状态",
+    "success": true,
+    "message": "按opened状态筛选成功",
+    "details": null,
+    "timestamp": "2025-08-23T15:29:38.389577"
+  },
+  {
+    "test_name": "合并请求统计 - merged状态",
+    "success": true,
+    "message": "按merged状态筛选成功",
+    "details": null,
+    "timestamp": "2025-08-23T15:29:38.392242"
+  },
+  {
+    "test_name": "合并请求统计 - closed状态",
+    "success": true,
+    "message": "按closed状态筛选成功",
+    "details": null,
+    "timestamp": "2025-08-23T15:29:38.396085"
+  },
+  {
+    "test_name": "时间分布 - commits按hour",
+    "success": true,
+    "message": "获取时间分布成功 - 数据点数: 24",
+    "details": null,
+    "timestamp": "2025-08-23T15:29:38.399492"
+  },
+  {
+    "test_name": "时间分布 - commits按weekday",
+    "success": true,
+    "message": "获取时间分布成功 - 数据点数: 7",
+    "details": null,
+    "timestamp": "2025-08-23T15:29:38.402404"
+  },
+  {
+    "test_name": "时间分布 - commits按month",
+    "success": true,
+    "message": "获取时间分布成功 - 数据点数: 12",
+    "details": null,
+    "timestamp": "2025-08-23T15:29:38.405500"
+  },
+  {
+    "test_name": "时间分布 - merge_requests按hour",
+    "success": true,
+    "message": "获取时间分布成功 - 数据点数: 24",
+    "details": null,
+    "timestamp": "2025-08-23T15:29:38.408572"
+  },
+  {
+    "test_name": "时间分布 - merge_requests按weekday",
+    "success": true,
+    "message": "获取时间分布成功 - 数据点数: 7",
+    "details": null,
+    "timestamp": "2025-08-23T15:29:38.411399"
+  },
+  {
+    "test_name": "用户分析 - 默认查询",
+    "success": true,
+    "message": "获取用户分析成功 - 用户: admin",
+    "details": {
+      "active_repositories": [],
+      "period": {
+        "days": 30,
+        "end_date": "2025-08-23T06:31:50.727932",
+        "start_date": "2025-07-24T06:31:50.727932"
+      },
+      "total_commits": 0,
+      "total_merge_requests": 0
+    },
+    "timestamp": "2025-08-23T15:29:38.414927"
+  },
+  {
+    "test_name": "用户分析 - 7天",
+    "success": true,
+    "message": "获取7天用户分析成功",
+    "details": null,
+    "timestamp": "2025-08-23T15:29:38.417520"
+  },
+  {
+    "test_name": "用户分析 - 30天",
+    "success": true,
+    "message": "获取30天用户分析成功",
+    "details": null,
+    "timestamp": "2025-08-23T15:29:38.420027"
+  },
+  {
+    "test_name": "用户分析 - 90天",
+    "success": true,
+    "message": "获取90天用户分析成功",
+    "details": null,
+    "timestamp": "2025-08-23T15:29:38.422734"
+  },
+  {
+    "test_name": "错误处理 - 无效日期",
+    "success": false,
+    "message": "期望400/422错误，实际状态码: 200",
+    "details": {
+      "code": 200,
+      "data": {
+        "active_contributors": 0,
+        "code_changes": {
+          "additions": 0,
+          "deletions": 0,
+          "net_changes": 0
+        },
+        "commits_count": 0,
+        "merge_requests_count": 0,
+        "period": {
+          "end_date": "2025-08-23T07:29:38.424361Z",
+          "start_date": "2025-07-24T07:29:38.424361Z"
+        },
+        "repositories_count": 5
+      },
+      "message": "获取分析概览成功",
+      "success": true,
+      "timestamp": "2025-08-23T07:29:38.425088Z"
+    },
+    "timestamp": "2025-08-23T15:29:38.425665"
+  },
+  {
+    "test_name": "错误处理 - 无效仓库ID",
+    "success": true,
+    "message": "正确返回错误状态码: 422",
+    "details": null,
+    "timestamp": "2025-08-23T15:29:38.428080"
+  },
+  {
+    "test_name": "错误处理 - 不存在用户",
+    "success": true,
+    "message": "正确返回404错误",
+    "details": null,
+    "timestamp": "2025-08-23T15:29:38.430540"
+  }
+]

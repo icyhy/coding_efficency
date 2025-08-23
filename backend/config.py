@@ -106,6 +106,11 @@ class Config:
     # 阿里云效API配置（保持向后兼容）
     YUNXIAO_API_BASE_URL = 'https://devops.aliyun.com/api/v4'
     
+    # 阿里云效API配置（从环境变量读取）
+    ALIYUNXIAO_API_BASE_URL = os.environ.get('ALIYUNXIAO_API_BASE_URL')
+    ALIYUNXIAO_ACCESS_TOKEN = os.environ.get('ALIYUNXIAO_ACCESS_TOKEN')
+    ALIYUNXIAO_ORGANIZATION_ID = os.environ.get('ALIYUNXIAO_ORGANIZATION_ID')
+    
     # 数据同步配置
     SYNC_BATCH_SIZE = 100
     SYNC_MAX_RETRIES = 3
@@ -138,7 +143,7 @@ class Config:
     SCHEDULER_API_ENABLED = True
     
     # 加密配置
-    ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY') or 'k1HWm0nrsHpcot0i2p8XOUDXGDokQxpKvIo6vmU-F74='
+    ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY') or 'HmzbMbCbkQDsdFxtlMO00BfOzIWYx3oSmysTOqSsYIQ='
     
     # 监控配置
     HEALTH_CHECK_ENABLED = True
@@ -200,6 +205,9 @@ class DevelopmentConfig(Config):
     # 开发环境JWT配置（更短的过期时间便于测试）
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=24)
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=7)
+    
+    # 开发环境加密密钥
+    ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY') or 'HmzbMbCbkQDsdFxtlMO00BfOzIWYx3oSmysTOqSsYIQ='
     
     @classmethod
     def init_app(cls, app):

@@ -1,11 +1,11 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
-import { getToken, removeToken } from '@/utils/auth'
+import { getToken, removeToken, clearAuth } from '@/utils/auth'
 import router from '@/router'
 
 // 创建axios实例
 const service = axios.create({
-  baseURL: 'http://localhost:5001/api', // 后端API地址
+  baseURL: '/api', // 使用代理路径
   timeout: 10000, // 请求超时时间
   headers: {
     'Content-Type': 'application/json'
@@ -15,6 +15,11 @@ const service = axios.create({
 // 请求拦截器
 service.interceptors.request.use(
   config => {
+    // 如果是refresh token请求，不要覆盖已设置的Authorization头
+    if (config.url.includes('/auth/refresh')) {
+      return config
+    }
+    
     // 添加认证token
     const token = getToken()
     if (token) {
@@ -28,13 +33,31 @@ service.interceptors.request.use(
   }
 )
 
+// 是否正在刷新token
+let isRefreshing = false
+// 失败队列
+let failedQueue = []
+
+// 处理队列
+const processQueue = (error, token = null) => {
+  failedQueue.forEach(prom => {
+    if (error) {
+      prom.reject(error)
+    } else {
+      prom.resolve(token)
+    }
+  })
+  
+  failedQueue = []
+}
+
 // 响应拦截器
 service.interceptors.response.use(
   response => {
     const { data } = response
     
-    // 如果返回的状态码为200，说明接口请求成功，可以正常拿到数据
-    if (response.status === 200) {
+    // 将所有2xx状态码视为成功
+    if (response.status >= 200 && response.status < 300) {
       return data
     }
     
@@ -42,8 +65,10 @@ service.interceptors.response.use(
     ElMessage.error(data.message || '请求失败')
     return Promise.reject(new Error(data.message || '请求失败'))
   },
-  error => {
+  async error => {
     console.error('响应错误:', error)
+    
+    const originalRequest = error.config
     
     // 处理不同的HTTP状态码
     if (error.response) {
@@ -51,10 +76,66 @@ service.interceptors.response.use(
       
       switch (status) {
         case 401:
-          ElMessage.error('登录已过期，请重新登录')
-          removeToken()
-          router.push('/login')
-          break
+          // 如果是刷新token的请求失败，直接登出
+          if (originalRequest.url.includes('/auth/refresh')) {
+            ElMessage.error('登录已过期，请重新登录')
+            clearAuth()
+            router.push('/login')
+            return Promise.reject(error)
+          }
+          
+          // 如果是云效API相关的请求失败，不清除用户登录状态
+          if (originalRequest.url.includes('/repositories') || 
+              originalRequest.url.includes('/integrations') ||
+              originalRequest.url.includes('/analytics')) {
+            // 这些可能是云效API调用失败，不影响用户登录状态
+            const errorMsg = data?.message || '访问云效API失败，请检查集成配置'
+            ElMessage.error(errorMsg)
+            return Promise.reject(error)
+          }
+          
+          // 避免重复刷新
+          if (originalRequest._retry) {
+            ElMessage.error('登录已过期，请重新登录')
+            clearAuth()
+            router.push('/login')
+            return Promise.reject(error)
+          }
+          
+          if (isRefreshing) {
+            // 如果正在刷新token，将请求加入队列
+            return new Promise((resolve, reject) => {
+              failedQueue.push({ resolve, reject })
+            }).then(token => {
+              originalRequest.headers.Authorization = `Bearer ${token}`
+              return service(originalRequest)
+            }).catch(err => {
+              return Promise.reject(err)
+            })
+          }
+          
+          originalRequest._retry = true
+          isRefreshing = true
+          
+          // 尝试刷新token
+          try {
+            const store = (await import('@/store')).default
+            await store.dispatch('auth/refreshToken')
+            const newToken = store.getters['auth/token']
+            
+            processQueue(null, newToken)
+            originalRequest.headers.Authorization = `Bearer ${newToken}`
+            return service(originalRequest)
+          } catch (refreshError) {
+            processQueue(refreshError, null)
+            ElMessage.error('登录已过期，请重新登录')
+            clearAuth()
+            router.push('/login')
+            return Promise.reject(refreshError)
+          } finally {
+            isRefreshing = false
+          }
+          
         case 403:
           ElMessage.error('没有权限访问该资源')
           break

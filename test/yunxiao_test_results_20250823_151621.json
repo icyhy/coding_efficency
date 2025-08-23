@@ -1,0 +1,157 @@
+{
+  "summary": {
+    "total_tests": 13,
+    "passed_tests": 11,
+    "failed_tests": 2,
+    "success_rate": "84.6%"
+  },
+  "test_results": [
+    {
+      "test_name": "用户登录",
+      "success": true,
+      "message": "登录成功，用户: admin",
+      "details": null,
+      "timestamp": "2025-08-23T15:16:21.082454"
+    },
+    {
+      "test_name": "云效仓库搜索 - 正常搜索",
+      "success": true,
+      "message": "搜索到 2 个仓库",
+      "details": {
+        "search_keyword": "test",
+        "result_count": 2
+      },
+      "timestamp": "2025-08-23T15:16:21.332754"
+    },
+    {
+      "test_name": "云效仓库搜索 - 空关键词",
+      "success": false,
+      "message": "期望400错误，实际状态码: 422",
+      "details": null,
+      "timestamp": "2025-08-23T15:16:21.335802"
+    },
+    {
+      "test_name": "云效仓库搜索 - 分页测试",
+      "success": true,
+      "message": "分页信息: 第N/A页，每页N/A条",
+      "details": {},
+      "timestamp": "2025-08-23T15:16:21.540825"
+    },
+    {
+      "test_name": "添加云效仓库 - 正常添加",
+      "success": true,
+      "message": "仓库添加成功 - ID: 6, 名称: test-repo-1755933381",
+      "details": {
+        "created_at": "2025-08-23T07:16:21.544163",
+        "id": 6,
+        "is_active": true,
+        "is_tracked": false,
+        "last_sync_at": null,
+        "name": "test-repo-1755933381",
+        "platform": "yunxiao",
+        "project_id": "12345",
+        "sync_status": "pending",
+        "updated_at": "2025-08-23T07:16:21.544164",
+        "url": "https://codeup.aliyun.com/test/test-repo-1755933381.git",
+        "user_id": 1
+      },
+      "timestamp": "2025-08-23T15:16:21.545889"
+    },
+    {
+      "test_name": "添加云效仓库 - 重复添加",
+      "success": true,
+      "message": "正确返回409冲突错误",
+      "details": {
+        "code": 409,
+        "data": null,
+        "error_code": "CONFLICT",
+        "message": "该仓库已存在",
+        "success": false,
+        "timestamp": "2025-08-23T07:16:21.548040Z"
+      },
+      "timestamp": "2025-08-23T15:16:21.548918"
+    },
+    {
+      "test_name": "添加云效仓库 - 缺少字段",
+      "success": false,
+      "message": "期望400验证错误，实际状态码: 422",
+      "details": null,
+      "timestamp": "2025-08-23T15:16:21.551215"
+    },
+    {
+      "test_name": "仓库统计管理 - 加入统计",
+      "success": true,
+      "message": "仓库 6 已加入统计",
+      "details": {
+        "created_at": "2025-08-23T07:16:21.544163",
+        "id": 6,
+        "is_active": true,
+        "is_tracked": true,
+        "last_sync_at": null,
+        "name": "test-repo-1755933381",
+        "platform": "yunxiao",
+        "project_id": "12345",
+        "sync_status": "pending",
+        "updated_at": "2025-08-23T07:16:21.553350",
+        "url": "https://codeup.aliyun.com/test/test-repo-1755933381.git",
+        "user_id": 1
+      },
+      "timestamp": "2025-08-23T15:16:21.554893"
+    },
+    {
+      "test_name": "仓库统计管理 - 重复加入",
+      "success": true,
+      "message": "正确处理重复加入，状态码: 409",
+      "details": null,
+      "timestamp": "2025-08-23T15:16:21.557902"
+    },
+    {
+      "test_name": "仓库统计管理 - 移出统计",
+      "success": true,
+      "message": "仓库 6 已移出统计",
+      "details": {
+        "created_at": "2025-08-23T07:16:21.544163",
+        "id": 6,
+        "is_active": true,
+        "is_tracked": false,
+        "last_sync_at": null,
+        "name": "test-repo-1755933381",
+        "platform": "yunxiao",
+        "project_id": "12345",
+        "sync_status": "pending",
+        "updated_at": "2025-08-23T07:16:21.559995",
+        "url": "https://codeup.aliyun.com/test/test-repo-1755933381.git",
+        "user_id": 1
+      },
+      "timestamp": "2025-08-23T15:16:21.561633"
+    },
+    {
+      "test_name": "仓库统计管理 - 不存在仓库",
+      "success": true,
+      "message": "正确返回404错误",
+      "details": null,
+      "timestamp": "2025-08-23T15:16:21.564604"
+    },
+    {
+      "test_name": "冲突处理测试 - 409响应",
+      "success": true,
+      "message": "正确返回409冲突错误: 该仓库已存在",
+      "details": {
+        "code": 409,
+        "data": null,
+        "error_code": "CONFLICT",
+        "message": "该仓库已存在",
+        "success": false,
+        "timestamp": "2025-08-23T07:16:21.570441Z"
+      },
+      "timestamp": "2025-08-23T15:16:21.570978"
+    },
+    {
+      "test_name": "冲突处理测试 - 中文错误消息",
+      "success": true,
+      "message": "错误消息包含中文提示",
+      "details": null,
+      "timestamp": "2025-08-23T15:16:21.570997"
+    }
+  ]
+}
