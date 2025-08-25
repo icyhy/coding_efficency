@@ -13,7 +13,7 @@ from datetime import timedelta
 from sqlalchemy.exc import IntegrityError
 
 from . import auth_bp as api_bp
-from ..models import User, IntegrationConfig
+from ..models import User
 from .. import db
 from ..utils.response import (
     success_response, error_response, validation_error_response,
@@ -93,11 +93,11 @@ def register():
         
         # 生成访问令牌
         access_token = create_access_token(
-            identity=user.id,
+            identity=str(user.id),
             expires_delta=timedelta(hours=24)
         )
         refresh_token = create_refresh_token(
-            identity=user.id,
+            identity=str(user.id),
             expires_delta=timedelta(days=30)
         )
         
@@ -176,11 +176,11 @@ def login():
         
         # 生成访问令牌
         access_token = create_access_token(
-            identity=user.id,
+            identity=str(user.id),
             expires_delta=timedelta(hours=24)
         )
         refresh_token = create_refresh_token(
-            identity=user.id,
+            identity=str(user.id),
             expires_delta=timedelta(days=30)
         )
         
@@ -220,8 +220,14 @@ def refresh():
     try:
         current_user_id = get_jwt_identity()
         
+        # 将字符串ID转换为整数
+        try:
+            user_id = int(current_user_id)
+        except (ValueError, TypeError):
+            return unauthorized_response("无效的用户ID格式")
+        
         # 查找用户
-        user = User.find_by_id(current_user_id)
+        user = User.find_by_id(user_id)
         if not user:
             return unauthorized_response("用户不存在")
         
@@ -231,7 +237,7 @@ def refresh():
         
         # 生成新的访问令牌
         new_access_token = create_access_token(
-            identity=user.id,
+            identity=str(user.id),
             expires_delta=timedelta(hours=24)
         )
         
@@ -607,306 +613,3 @@ def check_email():
     except Exception as e:
         current_app.logger.error(f"检查邮箱失败: {str(e)}")
         return error_response("检查邮箱失败")
-
-
-# 集成配置相关API端点
-
-@api_bp.route('/integrations', methods=['GET'])
-def get_integrations():
-    """
-    获取所有集成配置（测试用）
-    
-    Returns:
-        JSON响应包含集成配置列表
-    """
-    try:
-        # 获取所有集成配置（测试用，实际应该根据用户过滤）
-        configs = IntegrationConfig.query.all()
-        
-        # 转换为字典格式，不包含敏感信息
-        config_list = [config.to_dict(include_token=False) for config in configs]
-        
-        return success_response(
-            data={
-                'integrations': config_list,
-                'count': len(config_list)
-            },
-            message="获取集成配置成功"
-        )
-        
-    except Exception as e:
-        current_app.logger.error(f"获取集成配置失败: {str(e)}")
-        return error_response("获取集成配置失败")
-
-
-@api_bp.route('/integrations', methods=['POST'])
-def create_integration():
-    """
-    创建或更新集成配置
-    
-    Headers:
-        Authorization: Bearer <access_token>
-    
-    Request Body:
-        {
-            "platform": "yunxiao|github|gitlab",
-            "config_name": "配置名称",
-            "api_url": "API地址",
-            "access_token": "访问令牌",
-            "organization": "组织名称（可选）"
-        }
-    
-    Returns:
-        JSON响应包含创建的配置信息
-    """
-    try:
-        data = request.get_json()
-        
-        if not data:
-            return validation_error_response("请求数据不能为空")
-        
-        # 获取请求参数
-        platform = data.get('platform', '').strip().lower()
-        config_name = data.get('config_name', '').strip()
-        api_url = data.get('api_url', '').strip()
-        access_token = data.get('access_token', '').strip()
-        organization = data.get('organization', '').strip() or None
-        
-        # 验证必填字段
-        if not all([platform, config_name, api_url, access_token]):
-            return validation_error_response("平台类型、配置名称、API地址和访问令牌不能为空")
-        
-        # 验证平台类型
-        valid_platforms = ['yunxiao', 'github', 'gitlab']
-        if platform not in valid_platforms:
-            return validation_error_response(f"平台类型必须是: {', '.join(valid_platforms)}")
-        
-        # 检查是否已存在相同的配置（测试用，使用固定用户ID=1）
-        test_user_id = 1
-        existing_config = IntegrationConfig.query.filter_by(
-            user_id=test_user_id,
-            platform=platform,
-            config_name=config_name
-        ).first()
-        
-        if existing_config:
-            # 更新现有配置
-            existing_config.api_url = api_url
-            existing_config.set_access_token(access_token)
-            existing_config.organization = organization
-            existing_config.test_status = 'pending'
-            existing_config.test_message = None
-            
-            db.session.commit()
-            
-            return updated_response(
-                data=existing_config.to_dict(include_token=False),
-                message="集成配置更新成功"
-            )
-        else:
-            # 创建新配置
-            config = IntegrationConfig(
-                user_id=test_user_id,
-                platform=platform,
-                config_name=config_name,
-                api_url=api_url,
-                access_token=access_token,
-                organization=organization
-            )
-            
-            db.session.add(config)
-            db.session.commit()
-            
-            
-            return created_response(
-                data=config.to_dict(include_token=False),
-                message="集成配置创建成功"
-            )
-        
-    except IntegrityError:
-        db.session.rollback()
-        return conflict_response("配置名称已存在")
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f"创建集成配置失败: {str(e)}")
-        return error_response("创建集成配置失败")
-
-
-@api_bp.route('/integrations/<int:config_id>', methods=['PUT'])
-@token_required
-def update_integration(current_user, config_id):
-    """
-    更新集成配置
-    
-    Headers:
-        Authorization: Bearer <access_token>
-    
-    Request Body:
-        {
-            "config_name": "配置名称",
-            "api_url": "API地址",
-            "access_token": "访问令牌",
-            "organization": "组织名称（可选）",
-            "is_active": true
-        }
-    
-    Returns:
-        JSON响应包含更新后的配置信息
-    """
-    try:
-        # 查找配置
-        config = IntegrationConfig.query.filter_by(
-            id=config_id,
-            user_id=current_user.id
-        ).first()
-        
-        if not config:
-            return error_response("配置不存在", status_code=404)
-        
-        data = request.get_json()
-        if not data:
-            return validation_error_response("请求数据不能为空")
-        
-        # 更新字段
-        if 'config_name' in data:
-            config_name = data['config_name'].strip()
-            if config_name:
-                config.config_name = config_name
-        
-        if 'api_url' in data:
-            api_url = data['api_url'].strip()
-            if api_url:
-                config.api_url = api_url
-        
-        if 'access_token' in data:
-            access_token = data['access_token'].strip()
-            if access_token:
-                config.set_access_token(access_token)
-                config.test_status = 'pending'
-                config.test_message = None
-        
-        if 'organization' in data:
-            config.organization = data['organization'].strip() or None
-        
-        if 'is_active' in data:
-            config.is_active = bool(data['is_active'])
-        
-        db.session.commit()
-        
-        return updated_response(
-            data=config.to_dict(include_token=False),
-            message="集成配置更新成功"
-        )
-        
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f"更新集成配置失败: {str(e)}")
-        return error_response("更新集成配置失败")
-
-
-@api_bp.route('/integrations/<int:config_id>', methods=['DELETE'])
-@token_required
-def delete_integration(current_user, config_id):
-    """
-    删除集成配置
-    
-    Headers:
-        Authorization: Bearer <access_token>
-    
-    Returns:
-        JSON响应确认删除成功
-    """
-    try:
-        # 查找配置
-        config = IntegrationConfig.query.filter_by(
-            id=config_id,
-            user_id=current_user.id
-        ).first()
-        
-        if not config:
-            return error_response("配置不存在", status_code=404)
-        
-        db.session.delete(config)
-        db.session.commit()
-        
-        return success_response(
-            message="集成配置删除成功"
-        )
-        
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f"删除集成配置失败: {str(e)}")
-        return error_response("删除集成配置失败")
-
-
-@api_bp.route('/integrations/<int:config_id>/test', methods=['POST'])
-@token_required
-def test_integration(current_user, config_id):
-    """
-    测试集成配置连接
-    
-    Headers:
-        Authorization: Bearer <access_token>
-    
-    Returns:
-        JSON响应包含测试结果
-    """
-    try:
-        # 查找配置
-        config = IntegrationConfig.query.filter_by(
-            id=config_id,
-            user_id=current_user.id
-        ).first()
-        
-        if not config:
-            return error_response("配置不存在", status_code=404)
-        
-        # 这里应该根据不同平台实现具体的连接测试逻辑
-        # 暂时返回成功状态
-        import requests
-        
-        try:
-            # 简单的连接测试
-            access_token = config.get_access_token()
-            if not access_token:
-                raise Exception("无法获取访问令牌")
-            
-            # 根据平台类型进行不同的测试
-            if config.platform == 'yunxiao':
-                # 阿里云效API测试
-                headers = {'Authorization': f'Bearer {access_token}'}
-                response = requests.get(f"{config.api_url}/user", headers=headers, timeout=10)
-                response.raise_for_status()
-            elif config.platform == 'github':
-                # GitHub API测试
-                headers = {'Authorization': f'token {access_token}'}
-                response = requests.get(f"{config.api_url}/user", headers=headers, timeout=10)
-                response.raise_for_status()
-            elif config.platform == 'gitlab':
-                # GitLab API测试
-                headers = {'Authorization': f'Bearer {access_token}'}
-                response = requests.get(f"{config.api_url}/user", headers=headers, timeout=10)
-                response.raise_for_status()
-            
-            # 更新测试结果
-            config.update_test_result('success', '连接测试成功')
-            
-        except requests.RequestException as e:
-            config.update_test_result('failed', f'连接失败: {str(e)}')
-        except Exception as e:
-            config.update_test_result('failed', f'测试失败: {str(e)}')
-        
-        db.session.commit()
-        
-        return success_response(
-            data={
-                'test_status': config.test_status,
-                'test_message': config.test_message,
-                'last_test_at': config.last_test_at.isoformat() if config.last_test_at else None
-            },
-            message="连接测试完成"
-        )
-        
-    except Exception as e:
-        current_app.logger.error(f"测试集成配置失败: {str(e)}")
-        return error_response("测试集成配置失败")

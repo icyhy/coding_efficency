@@ -6,7 +6,7 @@ import { getToken } from '@/utils/auth'
 
 // 创建axios实例
 const service = axios.create({
-  baseURL: process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5001',
+  baseURL: process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5000',
   timeout: 15000 // 请求超时时间
 })
 
@@ -31,6 +31,11 @@ service.interceptors.request.use(
     return Promise.reject(error)
   }
 )
+
+// 是否正在刷新token
+let isRefreshing = false
+// 重试队列
+let requests = []
 
 // 响应拦截器
 service.interceptors.response.use(
@@ -83,7 +88,40 @@ service.interceptors.response.use(
     let message = '网络错误'
     
     if (error.response) {
-      const { status, data } = error.response
+      const { status, data, config } = error.response
+      
+      // 401错误且不是刷新token接口，尝试刷新token
+      if (status === 401 && !config.url.includes('/auth/refresh')) {
+        if (!isRefreshing) {
+          isRefreshing = true
+          
+          return store.dispatch('auth/refreshToken').then((newToken) => {
+            isRefreshing = false
+            // 重新发送所有等待的请求
+            requests.forEach(cb => cb(newToken))
+            requests = []
+            
+            // 重新发送当前请求
+            config.headers['Authorization'] = `Bearer ${newToken}`
+            return service(config)
+          }).catch(() => {
+            isRefreshing = false
+            requests = []
+            // 刷新失败，跳转到登录页
+            store.dispatch('auth/resetToken')
+            router.push('/login')
+            return Promise.reject(error)
+          })
+        } else {
+          // 正在刷新token，将请求加入队列
+          return new Promise((resolve) => {
+            requests.push((token) => {
+              config.headers['Authorization'] = `Bearer ${token}`
+              resolve(service(config))
+            })
+          })
+        }
+      }
       
       switch (status) {
         case 400:
@@ -91,9 +129,11 @@ service.interceptors.response.use(
           break
         case 401:
           message = '未授权，请重新登录'
-          // 清除token并跳转到登录页
-          store.dispatch('auth/resetToken')
-          router.push('/login')
+          // 如果是刷新token接口返回401，直接跳转登录页
+          if (config.url.includes('/auth/refresh')) {
+            store.dispatch('auth/resetToken')
+            router.push('/login')
+          }
           break
         case 403:
           message = '权限不足，拒绝访问'

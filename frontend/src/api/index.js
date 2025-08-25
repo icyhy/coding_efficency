@@ -86,12 +86,18 @@ service.interceptors.response.use(
           
           // 如果是云效API相关的请求失败，不清除用户登录状态
           if (originalRequest.url.includes('/repositories') || 
-              originalRequest.url.includes('/integrations') ||
-              originalRequest.url.includes('/analytics')) {
+              originalRequest.url.includes('/integrations')) {
             // 这些可能是云效API调用失败，不影响用户登录状态
             const errorMsg = data?.message || '访问云效API失败，请检查集成配置'
             ElMessage.error(errorMsg)
             return Promise.reject(error)
+          }
+          
+          // 如果是分析API相关的请求失败，尝试刷新Token
+          if (originalRequest.url.includes('/analytics')) {
+            // 这些是分析API调用，可能需要刷新Token
+            console.log('分析API请求失败，尝试刷新Token')
+            // 继续执行下面的Token刷新逻辑
           }
           
           // 避免重复刷新
@@ -119,7 +125,14 @@ service.interceptors.response.use(
           
           // 尝试刷新token
           try {
+            // 检查是否存在刷新Token
             const store = (await import('@/store')).default
+            const refreshTokenValue = store.getters['auth/refreshToken']
+            
+            if (!refreshTokenValue) {
+              throw new Error('Refresh Token不存在')
+            }
+            
             await store.dispatch('auth/refreshToken')
             const newToken = store.getters['auth/token']
             

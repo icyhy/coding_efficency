@@ -294,7 +294,8 @@ export default {
     const initCommitChart = async () => {
       if (!commitChartRef.value) return
       
-      let option = null
+      let dates = []
+      let values = []
       
       try {
         // 获取提交趋势数据
@@ -305,23 +306,29 @@ export default {
         }
         
         const response = await getDashboardData(params)
-        let dates = []
-        let values = []
         
         if (response && response.data && response.data.commit_trend) {
           const trend = response.data.commit_trend
           dates = trend.map(item => item.date)
           values = trend.map(item => item.count)
+          console.log('成功获取提交趋势数据:', dates, values)
         } else {
-          // 默认数据
-          const today = new Date()
-          for (let i = 6; i >= 0; i--) {
-            const date = new Date(today.getTime() - i * 24 * 60 * 60 * 1000)
-            dates.push(date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }))
-            values.push(Math.floor(Math.random() * 30) + 5)
-          }
+          console.warn('提交趋势数据格式不正确，使用默认数据')
+          throw new Error('数据格式不正确')
         }
-        
+      } catch (error) {
+        console.error('获取提交趋势数据失败:', error)
+        // 使用默认数据
+        const today = new Date()
+        for (let i = 6; i >= 0; i--) {
+          const date = new Date(today.getTime() - i * 24 * 60 * 60 * 1000)
+          dates.push(date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }))
+          values.push(Math.floor(Math.random() * 30) + 5)
+        }
+        console.log('使用默认提交趋势数据:', dates, values)
+      }
+      
+      try {
         chartData.commits.dates = dates
         chartData.commits.values = values
         
@@ -390,7 +397,7 @@ export default {
         const defaultValues = [12, 19, 15, 25, 22, 18, 20]
         
         commitChart = echarts.init(commitChartRef.value)
-        const option = {
+        const defaultOption = {
           tooltip: {
             trigger: 'axis',
             axisPointer: {
@@ -436,15 +443,33 @@ export default {
         }
         
         if (commitChart) {
-          commitChart.setOption(option)
+          commitChart.setOption(defaultOption)
         }
       }
     }
 
     const initMergeRequestChart = async () => {
-      if (!mergeRequestChartRef.value) return
+      if (!mergeRequestChartRef.value) {
+        console.warn('合并请求图表DOM元素不存在')
+        return
+      }
+      
+      // 确保DOM元素已正确挂载
+      await nextTick()
+      
+      // 检查DOM元素是否仍然存在
+      if (!mergeRequestChartRef.value) {
+        console.error('合并请求图表DOM元素在nextTick后仍不存在')
+        return
+      }
       
       let option
+      let mergeRequestData = [
+        { value: 35, name: '已合并', itemStyle: { color: '#67c23a' } },
+        { value: 15, name: '待审核', itemStyle: { color: '#e6a23c' } },
+        { value: 8, name: '已拒绝', itemStyle: { color: '#f56c6c' } },
+        { value: 12, name: '草稿', itemStyle: { color: '#909399' } }
+      ]
       
       try {
         // 获取合并请求数据
@@ -454,12 +479,6 @@ export default {
         }
         
         const response = await getDashboardData(params)
-        let mergeRequestData = [
-          { value: 35, name: '已合并', itemStyle: { color: '#67c23a' } },
-          { value: 15, name: '待审核', itemStyle: { color: '#e6a23c' } },
-          { value: 8, name: '已拒绝', itemStyle: { color: '#f56c6c' } },
-          { value: 12, name: '草稿', itemStyle: { color: '#909399' } }
-        ]
         
         if (response && response.data && response.data.merge_request_stats) {
           const stats = response.data.merge_request_stats
@@ -473,9 +492,25 @@ export default {
           chartData.mergeRequests.opened = stats.opened || 0
           chartData.mergeRequests.merged = stats.merged || 0
           chartData.mergeRequests.closed = stats.closed || 0
+          console.log('成功获取合并请求数据:', chartData.mergeRequests)
+        } else {
+          console.warn('合并请求数据格式不正确，使用默认数据')
+        }
+        
+      } catch (error) {
+        console.error('获取合并请求数据失败:', error)
+        // 继续使用默认数据
+      }
+      
+      // 统一初始化图表
+      try {
+        // 如果图表已存在，先销毁
+        if (mergeRequestChart) {
+          mergeRequestChart.dispose()
         }
         
         mergeRequestChart = echarts.init(mergeRequestChartRef.value)
+        
         option = {
           tooltip: {
             trigger: 'item',
@@ -510,41 +545,12 @@ export default {
           }]
         }
         
-      } catch (error) {
-        console.error('初始化合并请求图表失败:', error)
-        // 使用默认数据
-        mergeRequestChart = echarts.init(mergeRequestChartRef.value)
-        option = {
-          tooltip: {
-            trigger: 'item'
-          },
-          legend: {
-            bottom: '0%',
-            left: 'center'
-          },
-          series: [{
-            name: '合并请求',
-            type: 'pie',
-            radius: ['40%', '70%'],
-            center: ['50%', '45%'],
-            data: [
-              { value: 35, name: '已合并', itemStyle: { color: '#67c23a' } },
-              { value: 15, name: '待审核', itemStyle: { color: '#e6a23c' } },
-              { value: 8, name: '已拒绝', itemStyle: { color: '#f56c6c' } },
-              { value: 12, name: '草稿', itemStyle: { color: '#909399' } }
-            ],
-            emphasis: {
-              itemStyle: {
-                shadowBlur: 10,
-                shadowOffsetX: 0,
-                shadowColor: 'rgba(0, 0, 0, 0.5)'
-              }
-            }
-          }]
-        }
+        mergeRequestChart.setOption(option)
+        console.log('合并请求图表初始化成功')
+        
+      } catch (chartError) {
+        console.error('初始化合并请求图表失败:', chartError)
       }
-      
-      mergeRequestChart.setOption(option)
     }
 
     const initQualityChart = () => {
@@ -841,9 +847,17 @@ export default {
 
     // 生命周期
     onMounted(async () => {
+      // 等待一小段时间确保Token完全设置
+      await new Promise(resolve => setTimeout(resolve, 200))
+      
+      // 先加载基础数据
       await loadDashboardData()
       
-      nextTick(async () => {
+      // 等待DOM更新后再初始化图表
+      await nextTick()
+      
+      // 串行初始化图表，避免并发API调用导致Token冲突
+      try {
         await initCommitChart()
         await initMergeRequestChart()
         initQualityChart()
@@ -856,7 +870,10 @@ export default {
           qualityChart?.resize()
           activityChart?.resize()
         })
-      })
+      } catch (error) {
+        console.error('图表初始化失败:', error)
+        ElMessage.warning('部分图表加载失败，请刷新页面重试')
+      }
     })
 
     return {

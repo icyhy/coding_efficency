@@ -1,11 +1,11 @@
 import { login, getUserInfo, logout, refreshToken } from '@/api/auth'
-import { getToken, setToken, removeToken, getRefreshToken, setRefreshToken } from '@/utils/auth'
+import { getToken, setToken, removeToken, getRefreshToken, setRefreshToken, getUserInfo as getStoredUserInfo, setUserInfo, removeUserInfo } from '@/utils/auth'
 import router from '@/router'
 
 const state = {
   token: getToken(),
   refreshToken: getRefreshToken(),
-  user: null,
+  user: getStoredUserInfo(), // 从localStorage恢复用户信息
   permissions: []
 }
 
@@ -18,6 +18,10 @@ const mutations = {
   },
   SET_USER(state, user) {
     state.user = user
+    // 同时保存到localStorage
+    if (user) {
+      setUserInfo(user)
+    }
   },
   SET_PERMISSIONS(state, permissions) {
     state.permissions = permissions
@@ -27,6 +31,8 @@ const mutations = {
     state.refreshToken = null
     state.user = null
     state.permissions = []
+    // 清除localStorage中的用户信息
+    removeUserInfo()
   }
 }
 
@@ -53,13 +59,17 @@ const actions = {
         updated_at: userData.updated_at
       }
       
+      // 确保刷新Token存在
+      if (!refreshTokenValue) {
+        console.error('登录响应中缺少refresh_token')
+        throw new Error('登录失败：服务器未返回刷新令牌')
+      }
+      
       commit('SET_TOKEN', token)
       commit('SET_REFRESH_TOKEN', refreshTokenValue)
       commit('SET_USER', user)
       setToken(token)
-      if (refreshTokenValue) {
-        setRefreshToken(refreshTokenValue)
-      }
+      setRefreshToken(refreshTokenValue)
       
       return response
     } catch (error) {
@@ -114,6 +124,10 @@ const actions = {
   async refreshToken({ commit, state }) {
     try {
       if (!state.refreshToken) {
+        console.warn('Refresh Token不存在，无法刷新Token')
+        // 清除认证状态
+        commit('CLEAR_AUTH')
+        removeToken()
         throw new Error('Refresh Token不存在')
       }
       

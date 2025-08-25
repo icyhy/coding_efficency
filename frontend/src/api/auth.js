@@ -63,7 +63,8 @@ export function refreshToken() {
   const refreshTokenValue = getRefreshToken()
   
   if (!refreshTokenValue) {
-    return Promise.reject(new Error('Refresh token not found'))
+    console.error('刷新Token不存在，无法刷新访问令牌')
+    return Promise.reject(new Error('Refresh Token不存在'))
   }
   
   return request({

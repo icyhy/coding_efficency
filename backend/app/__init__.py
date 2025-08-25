@@ -42,7 +42,7 @@ def create_app(config_name='default'):
     migrate.init_app(app, db)
     
     # 导入所有模型以确保Flask-Migrate能够检测到它们
-    from app.models import User, Repository, Commit, MergeRequest, AnalyticsCache, IntegrationConfig
+    from app.models import User, Repository, Commit, MergeRequest, AnalyticsCache
     
     # 注册蓝图
     from app.api import auth_bp, repository_bp, analytics_bp

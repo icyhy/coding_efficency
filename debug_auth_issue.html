@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>认证问题调试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .warning { color: #ffc107; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 认证问题调试工具</h1>
+    
+    <div class="card">
+        <h2>1. 检查当前认证状态</h2>
+        <button onclick="checkAuthStatus()">检查认证状态</button>
+        <div id="authStatus"></div>
+    </div>
+
+    <div class="card">
+        <h2>2. 重新登录</h2>
+        <button onclick="reLogin()">重新登录</button>
+        <div id="loginResult"></div>
+    </div>
+
+    <div class="card">
+        <h2>3. 测试API调用</h2>
+        <button onclick="testDashboardAPI()">测试仪表盘API</button>
+        <div id="apiResult"></div>
+    </div>
+
+    <div class="card">
+        <h2>4. 调试日志</h2>
+        <div id="debugLog" class="log"></div>
+        <button onclick="clearLog()">清除日志</button>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        const TOKEN_KEY = 'coding_efficiency_token';
+        const REFRESH_TOKEN_KEY = 'coding_efficiency_refresh_token';
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('debugLog');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : '';
+            logDiv.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('debugLog').innerHTML = '';
+        }
+
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        }
+
+        function setCookie(name, value, days = 1) {
+            const date = new Date();
+            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+            const expires = `expires=${date.toUTCString()}`;
+            document.cookie = `${name}=${value}; ${expires}; path=/; SameSite=Strict`;
+        }
+
+        function deleteCookie(name) {
+            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+        }
+
+        async function checkAuthStatus() {
+            const resultDiv = document.getElementById('authStatus');
+            log('检查认证状态...');
+            
+            const token = getCookie(TOKEN_KEY);
+            const refreshToken = getCookie(REFRESH_TOKEN_KEY);
+            
+            let html = '<h3>Cookie状态:</h3>';
+            html += `<p>Access Token: ${token ? '<span class="success">✓ 存在</span>' : '<span class="error">✗ 不存在</span>'}</p>`;
+            html += `<p>Refresh Token: ${refreshToken ? '<span class="success">✓ 存在</span>' : '<span class="error">✗ 不存在</span>'}</p>`;
+            
+            if (token) {
+                try {
+                    const response = await fetch(`${API_BASE}/auth/profile`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        html += '<p class="success">✓ Token有效，用户已登录</p>';
+                        html += `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                        log('Token验证成功', 'success');
+                    } else {
+                        html += `<p class="error">✗ Token无效 (${response.status})</p>`;
+                        log(`Token验证失败: ${response.status}`, 'error');
+                    }
+                } catch (error) {
+                    html += `<p class="error">✗ 验证Token时出错: ${error.message}</p>`;
+                    log(`Token验证出错: ${error.message}`, 'error');
+                }
+            }
+            
+            resultDiv.innerHTML = html;
+        }
+
+        async function reLogin() {
+            const resultDiv = document.getElementById('loginResult');
+            log('开始重新登录...');
+            
+            try {
+                resultDiv.innerHTML = '正在登录...';
+                
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: 'admin',
+                        password: 'admin123'
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const userData = data.data;
+                    
+                    // 设置Token到Cookie
+                    setCookie(TOKEN_KEY, userData.access_token, 1/48); // 30分钟
+                    setCookie(REFRESH_TOKEN_KEY, userData.refresh_token, 7); // 7天
+                    
+                    resultDiv.innerHTML = `
+                        <p class="success">✓ 登录成功</p>
+                        <pre>${JSON.stringify(userData, null, 2)}</pre>
+                    `;
+                    
+                    log('登录成功，Token已设置', 'success');
+                    
+                    // 自动检查认证状态
+                    setTimeout(checkAuthStatus, 1000);
+                } else {
+                    const errorData = await response.json();
+                    resultDiv.innerHTML = `<p class="error">✗ 登录失败: ${errorData.message}</p>`;
+                    log(`登录失败: ${errorData.message}`, 'error');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">✗ 登录出错: ${error.message}</p>`;
+                log(`登录出错: ${error.message}`, 'error');
+            }
+        }
+
+        async function testDashboardAPI() {
+            const resultDiv = document.getElementById('apiResult');
+            log('测试仪表盘API...');
+            
+            const token = getCookie(TOKEN_KEY);
+            if (!token) {
+                resultDiv.innerHTML = '<p class="error">✗ 没有Token，请先登录</p>';
+                log('没有Token，无法测试API', 'error');
+                return;
+            }
+            
+            try {
+                const endDate = new Date().toISOString().split('T')[0];
+                const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                
+                const response = await fetch(`${API_BASE}/analytics/dashboard?start_date=${startDate}&end_date=${endDate}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    resultDiv.innerHTML = `
+                        <p class="success">✓ 仪表盘API调用成功</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                    log('仪表盘API调用成功', 'success');
+                } else {
+                    const errorData = await response.json();
+                    resultDiv.innerHTML = `<p class="error">✗ API调用失败 (${response.status}): ${errorData.message}</p>`;
+                    log(`API调用失败: ${response.status} - ${errorData.message}`, 'error');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">✗ API调用出错: ${error.message}</p>`;
+                log(`API调用出错: ${error.message}`, 'error');
+            }
+        }
+
+        // 页面加载时自动检查状态
+        window.onload = function() {
+            log('页面加载完成，开始检查认证状态');
+            checkAuthStatus();
+        };
+    </script>
+</body>
+</html>

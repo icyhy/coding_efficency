@@ -24,13 +24,21 @@ class Config:
     APP_VERSION = '1.0.0'
     
     # 数据库配置
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or f'sqlite:///{BASE_DIR}/app.db'
+    # 使用绝对路径确保SQLite可以正确找到数据库文件
+    # 确保instance目录存在
+    instance_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'instance')
+    if not os.path.exists(instance_dir):
+        os.makedirs(instance_dir)
+    
+    # 使用正斜杠替换反斜杠，避免Windows路径问题
+    db_path = os.path.join(instance_dir, 'app.db').replace('\\', '/')
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or f'sqlite:///{db_path}'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_RECORD_QUERIES = True
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_pre_ping': True,
         'pool_recycle': 300,
-        'connect_args': {'check_same_thread': False} if 'sqlite' in os.environ.get('DATABASE_URL', '') else {}
+        'connect_args': {'check_same_thread': False}
     }
     
     # JWT配置
@@ -42,7 +50,7 @@ class Config:
     JWT_BLACKLIST_TOKEN_CHECKS = ['access', 'refresh']
     
     # CORS配置
-    CORS_ORIGINS = os.environ.get('CORS_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000').split(',')
+    CORS_ORIGINS = os.environ.get('CORS_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:8000,http://127.0.0.1:8000').split(',')
     CORS_ALLOW_HEADERS = ['Content-Type', 'Authorization']
     CORS_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
     
@@ -143,7 +151,7 @@ class Config:
     SCHEDULER_API_ENABLED = True
     
     # 加密配置
-    ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY') or 'HmzbMbCbkQDsdFxtlMO00BfOzIWYx3oSmysTOqSsYIQ='
+    ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY') or 'bMVjgRWs9rReZ6fzeYeyn6udh0NeLMYRrj-cQAG8bp8='
     
     # 监控配置
     HEALTH_CHECK_ENABLED = True
@@ -207,7 +215,7 @@ class DevelopmentConfig(Config):
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=7)
     
     # 开发环境加密密钥
-    ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY') or 'HmzbMbCbkQDsdFxtlMO00BfOzIWYx3oSmysTOqSsYIQ='
+    ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY') or 'bMVjgRWs9rReZ6fzeYeyn6udh0NeLMYRrj-cQAG8bp8='
     
     @classmethod
     def init_app(cls, app):

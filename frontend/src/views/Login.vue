@@ -154,6 +154,15 @@ export default {
 
         ElMessage.success('登录成功')
         
+        // 等待更长时间确保Token完全设置到axios拦截器和Cookie中
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
+        // 验证Token是否正确设置
+        const currentToken = getToken()
+        if (!currentToken) {
+          throw new Error('Token设置失败，请重试')
+        }
+        
         // 跳转到目标页面或首页
         const redirect = route.query.redirect || '/dashboard'
         router.push(redirect)

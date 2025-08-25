@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #dff0d8;
+            border: 1px solid #d6e9c6;
+            color: #3c763d;
+        }
+        .error {
+            background-color: #f2dede;
+            border: 1px solid #ebccd1;
+            color: #a94442;
+        }
+        .info {
+            background-color: #d9edf7;
+            border: 1px solid #bce8f1;
+            color: #31708f;
+        }
+    </style>
+</head>
+<body>
+    <h1>登录测试工具</h1>
+    
+    <div class="container">
+        <h2>1. 登录表单</h2>
+        <div class="form-group">
+            <label for="username">用户名:</label>
+            <input type="text" id="username" value="admin" />
+        </div>
+        <div class="form-group">
+            <label for="password">密码:</label>
+            <input type="password" id="password" value="admin123" />
+        </div>
+        <button onclick="login()">登录</button>
+        <div id="loginResult" class="result"></div>
+    </div>
+    
+    <div class="container">
+        <h2>2. 请求详情</h2>
+        <div class="form-group">
+            <label for="requestUrl">请求URL:</label>
+            <input type="text" id="requestUrl" value="/api/auth/login" />
+        </div>
+        <div class="form-group">
+            <label>请求方法: POST</label>
+        </div>
+        <div class="form-group">
+            <label>请求头:</label>
+            <pre>Content-Type: application/json</pre>
+        </div>
+        <div class="form-group">
+            <label>请求体:</label>
+            <pre id="requestBody"></pre>
+        </div>
+    </div>
+    
+    <div class="container">
+        <h2>3. 响应详情</h2>
+        <pre id="responseDetails"></pre>
+    </div>
+    
+    <div class="container">
+        <h2>4. 网络请求日志</h2>
+        <button onclick="clearLog()">清除日志</button>
+        <pre id="networkLog"></pre>
+    </div>
+
+    <script>
+        // 更新请求体显示
+        function updateRequestBody() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const requestBody = {
+                username: username,
+                password: password
+            };
+            document.getElementById('requestBody').textContent = JSON.stringify(requestBody, null, 2);
+        }
+        
+        // 添加日志
+        function log(message, type = 'info') {
+            const logElement = document.getElementById('networkLog');
+            const timestamp = new Date().toLocaleTimeString();
+            const logMessage = `[${timestamp}] ${message}`;
+            logElement.textContent = logMessage + '\n' + logElement.textContent;
+            console.log(logMessage);
+        }
+        
+        // 清除日志
+        function clearLog() {
+            document.getElementById('networkLog').textContent = '';
+        }
+        
+        // 登录函数
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const requestUrl = document.getElementById('requestUrl').value;
+            
+            // 更新请求体显示
+            updateRequestBody();
+            
+            // 清除之前的结果
+            const resultElement = document.getElementById('loginResult');
+            resultElement.textContent = '正在登录...';
+            resultElement.className = 'result info';
+            
+            document.getElementById('responseDetails').textContent = '';
+            
+            try {
+                log(`发送登录请求到 ${requestUrl}`);
+                
+                // 发送登录请求到后端服务器
+                const backendUrl = 'http://localhost:5000' + requestUrl;
+                console.log(`发送请求到: ${backendUrl}`);
+                log(`发送请求到: ${backendUrl}`);
+                const requestData = {
+                    username: username,
+                    password: password
+                };
+                log(`请求数据: ${JSON.stringify(requestData)}`);
+                
+                const response = await fetch(backendUrl, {
+                    mode: 'cors',
+                    credentials: 'include',
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                log(`响应状态: ${response.status} ${response.statusText}`);
+                const responseHeaders = {};
+                response.headers.forEach((value, key) => {
+                    responseHeaders[key] = value;
+                });
+                log(`响应头: ${JSON.stringify(responseHeaders)}`);
+                
+                // 获取响应文本
+                const responseText = await response.text();
+                let responseData;
+                try {
+                    responseData = JSON.parse(responseText);
+                } catch (e) {
+                    responseData = { raw: responseText };
+                }
+                
+                // 记录响应状态
+                log(`收到响应: 状态码 ${response.status} ${response.statusText}`);
+                
+                // 显示详细响应
+                document.getElementById('responseDetails').textContent = 
+                    `状态码: ${response.status} ${response.statusText}\n` +
+                    `响应体:\n${JSON.stringify(responseData, null, 2)}`;
+                
+                // 处理响应
+                if (response.ok) {
+                    resultElement.textContent = '登录成功!';
+                    resultElement.className = 'result success';
+                    log('登录成功', 'success');
+                    
+                    // 如果有token，显示它
+                    if (responseData.data && responseData.data.access_token) {
+                        const token = responseData.data.access_token;
+                        log(`获取到访问令牌: ${token.substring(0, 15)}...`);
+                    }
+                } else {
+                    resultElement.textContent = `登录失败: ${response.status} ${response.statusText}`;
+                    resultElement.className = 'result error';
+                    log(`登录失败: ${response.status} ${response.statusText}`, 'error');
+                }
+            } catch (error) {
+                resultElement.textContent = `请求错误: ${error.message}`;
+                resultElement.className = 'result error';
+                log(`请求错误: ${error.message}`, 'error');
+                
+                document.getElementById('responseDetails').textContent = 
+                    `错误:\n${error.stack || error.message}`;
+            }
+        }
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            updateRequestBody();
+            log('页面加载完成，准备测试登录功能');
+        });
+        
+        // 监听输入变化
+        document.getElementById('username').addEventListener('input', updateRequestBody);
+        document.getElementById('password').addEventListener('input', updateRequestBody);
+    </script>
+</body>
+</html>

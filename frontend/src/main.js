@@ -34,5 +34,14 @@ if (refreshToken) {
   store.commit('auth/SET_REFRESH_TOKEN', refreshToken)
 }
 
+// 如果存在token但没有用户信息，则获取用户信息
+if (token && !store.getters['auth/user']) {
+  store.dispatch('auth/getUserInfo').catch(error => {
+    console.error('获取用户信息失败:', error)
+    // 如果获取用户信息失败，清除token
+    store.dispatch('auth/resetToken')
+  })
+}
+
 // 挂载应用
 app.mount('#app')

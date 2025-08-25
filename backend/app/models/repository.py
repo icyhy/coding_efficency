@@ -77,7 +77,7 @@ class Repository(db.Model):
             api_key (str): 明文API密钥
         """
         if api_key:
-            key = current_app.config['ENCRYPTION_KEY'].encode()
+            key = current_app.config['ENCRYPTION_KEY']
             f = Fernet(key)
             self.api_key_encrypted = f.encrypt(api_key.encode()).decode()
     
@@ -90,7 +90,7 @@ class Repository(db.Model):
         """
         if self.api_key_encrypted:
             try:
-                key = current_app.config['ENCRYPTION_KEY'].encode()
+                key = current_app.config['ENCRYPTION_KEY']
                 f = Fernet(key)
                 return f.decrypt(self.api_key_encrypted.encode()).decode()
             except Exception:

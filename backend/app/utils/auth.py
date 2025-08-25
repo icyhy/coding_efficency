@@ -36,8 +36,18 @@ def token_required(f):
                     'error_code': 'INVALID_TOKEN'
                 }), 401
             
+            # 将字符串ID转换为整数
+            try:
+                user_id = int(current_user_id)
+            except (ValueError, TypeError):
+                return jsonify({
+                    'success': False,
+                    'message': '无效的用户ID格式',
+                    'error_code': 'INVALID_USER_ID'
+                }), 401
+            
             # 检查用户是否存在且活跃
-            user = User.find_by_id(current_user_id)
+            user = User.find_by_id(user_id)
             if not user or not user.is_active:
                 return jsonify({
                     'success': False,
@@ -122,7 +132,11 @@ def get_current_user():
         current_user_id = get_jwt_identity()
         
         if current_user_id:
-            user = User.find_by_id(current_user_id)
+            try:
+                user_id = int(current_user_id)
+                user = User.find_by_id(user_id)
+            except (ValueError, TypeError):
+                return None
             if user and user.is_active:
                 return user
         

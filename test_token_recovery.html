@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Token恢复机制测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .danger {
+            background-color: #dc3545;
+        }
+        .danger:hover {
+            background-color: #c82333;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Token恢复机制测试</h1>
+        <p>此页面用于测试页面刷新后Token和用户信息的恢复机制</p>
+        
+        <div class="test-section">
+            <h3>1. 当前认证状态</h3>
+            <div id="auth-status"></div>
+            <button onclick="checkAuthStatus()">检查认证状态</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>2. Cookie和LocalStorage状态</h3>
+            <div id="storage-status"></div>
+            <button onclick="checkStorageStatus()">检查存储状态</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>3. 模拟登录</h3>
+            <div id="login-status"></div>
+            <button onclick="simulateLogin()">模拟登录</button>
+            <button onclick="clearAuth()" class="danger">清除认证信息</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>4. 页面刷新测试</h3>
+            <div id="refresh-status"></div>
+            <button onclick="testRefresh()">刷新页面测试</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>5. API调用测试</h3>
+            <div id="api-status"></div>
+            <button onclick="testApiCall()">测试API调用</button>
+        </div>
+    </div>
+
+    <script>
+        // 获取Cookie的函数
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        }
+        
+        // 设置Cookie的函数
+        function setCookie(name, value, days = 7) {
+            const expires = new Date();
+            expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+            document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
+        }
+        
+        // 检查认证状态
+        function checkAuthStatus() {
+            const statusDiv = document.getElementById('auth-status');
+            const token = getCookie('coding_efficiency_token');
+            const refreshToken = getCookie('coding_efficiency_refresh_token');
+            const userInfo = localStorage.getItem('user_info');
+            
+            let html = '';
+            
+            if (token) {
+                html += '<div class="status success">✓ Access Token存在</div>';
+            } else {
+                html += '<div class="status error">✗ Access Token不存在</div>';
+            }
+            
+            if (refreshToken) {
+                html += '<div class="status success">✓ Refresh Token存在</div>';
+            } else {
+                html += '<div class="status error">✗ Refresh Token不存在</div>';
+            }
+            
+            if (userInfo) {
+                try {
+                    const user = JSON.parse(userInfo);
+                    html += '<div class="status success">✓ 用户信息存在</div>';
+                    html += `<pre>用户信息: ${JSON.stringify(user, null, 2)}</pre>`;
+                } catch (e) {
+                    html += '<div class="status error">✗ 用户信息格式错误</div>';
+                }
+            } else {
+                html += '<div class="status error">✗ 用户信息不存在</div>';
+            }
+            
+            statusDiv.innerHTML = html;
+        }
+        
+        // 检查存储状态
+        function checkStorageStatus() {
+            const statusDiv = document.getElementById('storage-status');
+            
+            let html = '<h4>Cookies:</h4>';
+            const cookies = document.cookie.split(';');
+            cookies.forEach(cookie => {
+                const [name, value] = cookie.trim().split('=');
+                if (name.includes('coding_efficiency')) {
+                    html += `<div class="status info">${name}: ${value ? '存在' : '空'}</div>`;
+                }
+            });
+            
+            html += '<h4>LocalStorage:</h4>';
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key.includes('user') || key.includes('auth')) {
+                    const value = localStorage.getItem(key);
+                    html += `<div class="status info">${key}: ${value ? '存在' : '空'}</div>`;
+                }
+            }
+            
+            statusDiv.innerHTML = html;
+        }
+        
+        // 模拟登录
+        async function simulateLogin() {
+            const statusDiv = document.getElementById('login-status');
+            statusDiv.innerHTML = '<div class="status info">正在模拟登录...</div>';
+            
+            try {
+                const response = await fetch('http://localhost:5000/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: 'admin',
+                        password: 'admin123'
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // 设置tokens到cookie
+                    setCookie('coding_efficiency_token', data.access_token);
+                    setCookie('coding_efficiency_refresh_token', data.refresh_token);
+                    
+                    // 设置用户信息到localStorage
+                    localStorage.setItem('user_info', JSON.stringify(data.user));
+                    
+                    statusDiv.innerHTML = '<div class="status success">✓ 登录成功，认证信息已保存</div>';
+                } else {
+                    const error = await response.json();
+                    statusDiv.innerHTML = `<div class="status error">✗ 登录失败: ${error.message}</div>`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="status error">✗ 登录请求失败: ${error.message}</div>`;
+            }
+        }
+        
+        // 清除认证信息
+        function clearAuth() {
+            document.cookie = 'coding_efficiency_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+            document.cookie = 'coding_efficiency_refresh_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+            localStorage.removeItem('user_info');
+            
+            const statusDiv = document.getElementById('login-status');
+            statusDiv.innerHTML = '<div class="status info">认证信息已清除</div>';
+        }
+        
+        // 页面刷新测试
+        function testRefresh() {
+            const statusDiv = document.getElementById('refresh-status');
+            statusDiv.innerHTML = '<div class="status info">即将刷新页面，请观察认证状态是否保持...</div>';
+            
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+        }
+        
+        // API调用测试
+        async function testApiCall() {
+            const statusDiv = document.getElementById('api-status');
+            statusDiv.innerHTML = '<div class="status info">正在测试API调用...</div>';
+            
+            const token = getCookie('coding_efficiency_token');
+            if (!token) {
+                statusDiv.innerHTML = '<div class="status error">✗ 没有Token，无法调用API</div>';
+                return;
+            }
+            
+            try {
+                const response = await fetch('http://localhost:5000/api/auth/user', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    statusDiv.innerHTML = '<div class="status success">✓ API调用成功</div>';
+                    statusDiv.innerHTML += `<pre>返回数据: ${JSON.stringify(data, null, 2)}</pre>`;
+                } else {
+                    const error = await response.json();
+                    statusDiv.innerHTML = `<div class="status error">✗ API调用失败: ${error.message}</div>`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="status error">✗ API请求失败: ${error.message}</div>`;
+            }
+        }
+        
+        // 页面加载时自动检查状态
+        window.onload = function() {
+            checkAuthStatus();
+            checkStorageStatus();
+        };
+    </script>
+</body>
+</html>
