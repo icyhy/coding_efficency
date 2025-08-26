@@ -7,7 +7,6 @@ WORKDIR /app
 # 设置环境变量
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    FLASK_ENV=production \
     PYTHONPATH=/app
 
 # 安装系统依赖

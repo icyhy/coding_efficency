@@ -6,7 +6,7 @@ import { getToken } from '@/utils/auth'
 
 // 创建axios实例
 const service = axios.create({
-  baseURL: process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5000',
+  baseURL: process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:8000/api',
   timeout: 15000 // 请求超时时间
 })
 

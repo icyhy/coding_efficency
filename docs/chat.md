@@ -47,7 +47,7 @@ answer：你是一位资深的全栈开发工程师和产品设计师，专精�
 - 状态管理（Redux、Vuex或Pinia）
 
 ### 后端技术栈
-- 选择合适的后端框架（Python + Flask）
+- 选择合适的后端框架（Python + FastAPI）
 - RESTful API设计
 - 数据库设计（sqlite）
 - 身份验证和授权（JWT、OAuth等）

@@ -2,12 +2,12 @@
 
 ## 系统架构概览
 
-本项目采用前后端分离的架构设计，前端使用Vue.js构建SPA应用，后端使用Flask提供RESTful API服务。
+本项目采用前后端分离的架构设计，前端使用Vue.js构建SPA应用，后端使用FastAPI提供RESTful API服务。
 
 ```
 ┌─────────────────┐    HTTP/HTTPS    ┌─────────────────┐
 │                 │ ◄──────────────► │                 │
-│   Vue.js 前端   │                  │   Flask 后端    │
+│   Vue.js 前端   │                  │  FastAPI 后端   │
 │                 │                  │                 │
 └─────────────────┘                  └─────────────────┘
                                               │
@@ -66,10 +66,10 @@ frontend/
 ### 后端架构
 
 #### 技术栈
-- **Flask**: 轻量级Web框架
+- **FastAPI**: 现代高性能Web框架
 - **SQLAlchemy**: ORM数据库操作
-- **Flask-JWT-Extended**: JWT身份验证
-- **Flask-CORS**: 跨域资源共享
+- **python-jose**: JWT身份验证
+- **FastAPI CORS**: 跨域资源共享
 - **Requests**: HTTP请求库
 - **APScheduler**: 定时任务调度
 - **SQLite**: 轻量级数据库
@@ -78,7 +78,7 @@ frontend/
 ```
 backend/
 ├── app/
-│   ├── __init__.py         # Flask应用工厂
+│   ├── main.py            # FastAPI应用入口
 │   ├── models/             # 数据模型
 │   │   ├── __init__.py
 │   │   ├── user.py         # 用户模型
@@ -215,7 +215,7 @@ backend/
 
 ### Docker容器化
 - 前端Nginx容器
-- 后端Flask容器
+- 后端FastAPI容器
 - 数据库SQLite文件挂载
 - Docker Compose编排
 

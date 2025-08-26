@@ -45,19 +45,23 @@ const actions = {
   async login({ commit }, loginForm) {
     try {
       const response = await login(loginForm)
-      const userData = response.data
+      // 响应拦截器已经返回了data，所以response就是tokenData
+      const tokenData = response
       
-      // 后端返回的数据结构中token包含在用户数据中
-      const token = userData.access_token
-      const refreshTokenValue = userData.refresh_token
-      const user = {
-        id: userData.id,
-        username: userData.username,
-        email: userData.email,
-        is_active: userData.is_active,
-        created_at: userData.created_at,
-        updated_at: userData.updated_at
-      }
+      // 后端返回的是Token对象，包含access_token, refresh_token, token_type
+      const token = tokenData.access_token
+      const refreshTokenValue = tokenData.refresh_token
+      
+      // 需要获取用户信息，先设置token然后调用用户信息接口
+      commit('SET_TOKEN', token)
+      commit('SET_REFRESH_TOKEN', refreshTokenValue)
+      setToken(token)
+      setRefreshToken(refreshTokenValue)
+      
+      // 获取用户信息
+      const userResponse = await getUserInfo()
+      // 响应拦截器已经返回了data，所以userResponse就是用户数据
+      const user = userResponse
       
       // 确保刷新Token存在
       if (!refreshTokenValue) {
@@ -65,11 +69,7 @@ const actions = {
         throw new Error('登录失败：服务器未返回刷新令牌')
       }
       
-      commit('SET_TOKEN', token)
-      commit('SET_REFRESH_TOKEN', refreshTokenValue)
       commit('SET_USER', user)
-      setToken(token)
-      setRefreshToken(refreshTokenValue)
       
       return response
     } catch (error) {
@@ -88,12 +88,13 @@ const actions = {
       }
       
       const response = await getUserInfo()
-      const { user, permissions } = response.data
+      // 后端直接返回用户信息，不是嵌套在data字段中
+      const user = response
       
       commit('SET_USER', user)
-      commit('SET_PERMISSIONS', permissions || [])
+      commit('SET_PERMISSIONS', []) // 暂时设置为空数组，后续可以从后端获取
       
-      return response
+      return { data: user }
     } catch (error) {
       commit('CLEAR_AUTH')
       removeToken()
@@ -132,7 +133,8 @@ const actions = {
       }
       
       const response = await refreshToken()
-      const { access_token } = response.data
+      // 响应拦截器已经返回了data，所以response就是token数据
+      const { access_token } = response
       
       commit('SET_TOKEN', access_token)
       setToken(access_token)

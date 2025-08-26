@@ -61,7 +61,7 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 
-# Flask stuff:
+# FastAPI stuff:
 instance/
 .webassets-cache
 
@@ -164,7 +164,7 @@ cython_debug/
 *.sqlite3
 app.db
 
-# Flask migrations
+# Database migrations
 migrations/versions/*.py
 !migrations/versions/__init__.py
 

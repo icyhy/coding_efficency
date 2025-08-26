@@ -14,7 +14,7 @@
 - Vite构建工具
 
 ### 后端
-- Python Flask
+- Python FastAPI
 - SQLite数据库
 - JWT身份验证
 - 阿里云效API集成
@@ -23,16 +23,14 @@
 
 ```
 coding_efficency/
-├── backend/                 # 后端Flask应用
+├── backend/                 # 后端FastAPI应用
 │   ├── app/                # 应用核心代码
-│   │   ├── __init__.py
+│   │   ├── main.py        # FastAPI应用入口
 │   │   ├── models/         # 数据模型
 │   │   ├── api/           # API路由
 │   │   ├── services/      # 业务逻辑服务
-│   │   └── utils/         # 工具函数
-│   ├── config.py          # 配置文件
-│   ├── requirements.txt   # Python依赖
-│   └── run.py            # 应用启动文件
+│   │   └── core/          # 核心配置
+│   └── requirements.txt   # Python依赖
 ├── frontend/               # 前端Vue应用
 │   ├── src/
 │   │   ├── components/    # Vue组件
@@ -77,7 +75,7 @@ coding_efficency/
 ```bash
 cd backend
 pip install -r requirements.txt
-python run.py
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### 前端启动

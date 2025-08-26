@@ -11,7 +11,7 @@ services:
     ports:
       - "5000:5000"
     environment:
-      - FLASK_ENV=docker
+      - FASTAPI_ENV=docker
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-jwt-secret-key-here}
       - DATABASE_URL=sqlite:///data/coding_efficiency.db
